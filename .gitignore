@@ -1,0 +1,16 @@
+# Dependency directories.
+src/deps/*
+!src/deps/DEPENDENCIES.md
+
+# Build directory.
+build/
+
+# Eclipse project files.
+.project
+.cproject
+
+# VS project files.
+vs
+
+# IMGUI settings.
+imgui.ini
