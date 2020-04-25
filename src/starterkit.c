@@ -29,6 +29,12 @@
 //
 // Logging support.
 //
+// Logging starts off with a default of writing to a console until the
+// window system is up and running.  For errors during initialization where
+// there is no console, having OS-specific functions to display a dialog box
+// might be an option (and certainly more friendly for the user rather than
+// the app silently failing).
+//
 // ==========================================================================
 
 
@@ -184,8 +190,16 @@ sk_log_ex(app_s *app, uint32_t level, const char *file, uint32_t linenum, const 
 // sk_log_ex()
 
 
+// TODO Set up OS specific call-backs to display a system dialog box to allow
+//      initialization error messages to be seen in cases where there is no
+//      console, and before he windowing system has been established.
+
+
 /**
  * Command shell logging.
+ *
+ * Once the GUI is set up and working, the logging call-back should be changed
+ * from this function to the GUI logging system.
  *
  * @param app
  * @param buf
@@ -386,8 +400,12 @@ main(int argc, char *argv[])
 
         // Blocking call, runs the GUI until the user quits.
         SK_LOG_DBG(&app, "Staring GUI.");
-        sk_gui_run(&app);
-        SK_LOG_DBG(&app, "GUI closed.");
+        int rtn = sk_gui_run(&app);
+        if ( rtn != 0 ) {
+            SK_LOG_WARN(&app, "GUI returned error code [%d].", rtn);
+        } else {
+            SK_LOG_DBG(&app, "GUI closed.");
+        }
 
     XYZ_END
 

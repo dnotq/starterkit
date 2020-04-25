@@ -9,8 +9,9 @@ add_executable(starterkit
     ${IMGUI_DIR}/imgui.cpp
     ${IMGUI_DIR}/imgui_widgets.cpp
     ${IMGUI_DIR}/imgui_draw.cpp
-    ${IMGUI_DIR}/examples/imgui_impl_sdl.cpp
-    ${IMGUI_DIR}/examples/imgui_impl_opengl2.cpp
+    ${IMGUI_DIR}/examples/imgui_impl_sdl.cpp     # change to implementation.
+    ${IMGUI_DIR}/examples/imgui_impl_opengl3.cpp # change to implementation.
+    ${IMGUI_DIR}/examples/libs/gl3w/GL/gl3w.c
 )
 
 target_compile_definitions(starterkit PRIVATE
@@ -18,10 +19,11 @@ target_compile_definitions(starterkit PRIVATE
 )
 
 target_include_directories(starterkit PRIVATE
+    ${SDL2_INCLUDE_DIR}
     ${STB_DIR}
     ${LIBUV_DIR}/include
     ${IMGUI_DIR}
-    ${SDL2_INCLUDE_DIR}
+    ${IMGUI_DIR}/examples/libs/gl3w
 )
 
 target_link_libraries(starterkit

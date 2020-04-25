@@ -2,7 +2,11 @@
 
 Provides a C/C++ starter-kit setup for cross-platform application or game
 development.  Executables created with this kit will be very small and only have
-a few DLL or SO dependencies (SDL2 and LibUV).
+a few DLL or SO dependencies (SDL2 and LibUV) that are not already part of a
+standard operating system.
+
+The stock application created uses SDL2 and OpenGL3.x for graphics, IMGUI for
+the UI, and LibUV for other OS abstractions.
 
 ## Requirements
 
@@ -149,15 +153,16 @@ manually (see the SDL2 dependency `libs` directory).
 The code is roughly split into to main parts consisting of the GUI and the
 application.
 
-The SDL2-based GUI is required to run on the main process, so a LibUV thread
-is created to run the application.  Both SDL2 and LibUV work in an event
-type configuration, and application code is generally executed via call-backs
-(in the case of LibUV), or in response to user events (in the case of SDL2).
+The SDL2 event-handler is required to run on the main process, so an SDL2
+thread is created for rendering, and a LibUV thread is created to run the
+application.  Both SDL2 and LibUV use an event-model, and application code is
+generally executed via call-backs (in the case of LibUV), or in response to
+user events (in the case of SDL2).
 
 The GUI and application-thread communicate via an asynchronous LibUV signal.
 
 ```
-main -+---> sk_gui_run()  SDL2+IMGUI
+main -+---> sk_gui_run()  SDL2+OpenGL3+IMGUI
       |        |
       |        | GUI calls to let app know of a user action.
       |        V
@@ -172,41 +177,25 @@ Updates from the application to the GUI are simply via changes to application
 data that the GUI is watching and presenting.
 
 If a design requires both the GUI and application to update (write) the same
-data, standard synchronization techniques should be used.  LibUV provides an
-abstraction for synchronization.
+data, standard synchronization techniques should be used.  Both SDL2 and LibUV
+provide synchronization abstractions that can be used.
 
-### Main Loop
+### Event Loop and Rendering Thread
 
-The SDL2-based GUI loop provided here is a hybrid between a game-style loop
-which polls, and a purely event-based loop which always blocks waiting for
-events.
+The SDL2 event-loop runs on the main process and creates an SDL2 thread for
+rendering.  This separation, along with the application-thread, allows the
+data-model and display to be updated even if the event-loop is saturated or
+blocking.  For example, when dragging or resizing the main window on a Windows
+OS, the event loop will block and would stall a combined event+render loop.
 
-This hybrid design is to avoid the straight game-style polling-loop which causes
-higher CPU utilization (than an event-triggered loop), and is undesirable when
-writing more traditional (non-game) applications.
-
-The loop will block for a maximum timeout waiting for events, and if no events
-are received it will go ahead and run through the loop once to allow non-event
-type activity to be performed.
-
-This format makes the loop adaptable and it becomes more responsive when there
-are a lot of events, i.e. a lot of user interaction, since the event-wait call
-will return immediately.  When there are no events, the loop scales back to
-spending most of its time waiting, which keeps its CPU use low like most
-event-only applications.  However the loop is still executed at a minimum rate
-even when there are no events.
-
-The loop can easily be changed to a polling-only or event-only type, however
-in a purely event-based loop the UI will be sluggish, which is due to the
-Immediate-Mode design.
-
-In practice, the default hybrid loop shows around 1% to 2% CPU when idle.  The
-polling-only loop idles around 20% CPU.  Of course these statistics are from one
-particular system (typical 2016, ~2.5GHz, x64 laptop).
+In practice an SDL2 application is meant for games and CPU use is a little high
+when compared to a traditional application.  To help with this, the render-loop
+has a sleep-delay that reduces application idle utilization to about 8% CPU
+(statistics taken from one system, a typical 2016, ~2.5GHz, x64 laptop).
 
 ----
 
-# IMGUI Fonts
+## IMGUI Fonts
 
 IMGUI provides some true-type fonts to use instead of the single built-in
 "proggy-clean" font.
@@ -240,7 +229,7 @@ ImGui::GetIO().Fonts->AddFontFromMemoryCompressedBase85TTF(cousine_font_compress
 
 ----
 
-# License
+## License
 
 In the spirit of the STB library, this code is in the public domain. You can do
 anything you want with it.  You have no legal obligation to do anything else,

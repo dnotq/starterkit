@@ -8,6 +8,7 @@ build/
 # Eclipse project files.
 .project
 .cproject
+.settings
 
 # VS project files.
 vs
