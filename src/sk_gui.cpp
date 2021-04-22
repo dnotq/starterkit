@@ -15,8 +15,8 @@
 // IMGUI has pre-build wrappers for many graphics subsystems.
 #define IMGUI_IMPL_OPENGL_LOADER_GL3W
 #include "imgui.h"
-#include "examples/imgui_impl_sdl.h"
-#include "examples/imgui_impl_opengl3.h"
+#include "backends/imgui_impl_sdl.h"
+#include "backends/imgui_impl_opengl3.h"
 
 // SDL2
 #include "SDL.h"

@@ -8,9 +8,10 @@ add_executable(starterkit
     ${IMGUI_DIR}/imgui_demo.cpp # remove if not needed.
     ${IMGUI_DIR}/imgui.cpp
     ${IMGUI_DIR}/imgui_widgets.cpp
+    ${IMGUI_DIR}/imgui_tables.cpp
     ${IMGUI_DIR}/imgui_draw.cpp
-    ${IMGUI_DIR}/examples/imgui_impl_sdl.cpp     # change to implementation.
-    ${IMGUI_DIR}/examples/imgui_impl_opengl3.cpp # change to implementation.
+    ${IMGUI_DIR}/backends/imgui_impl_sdl.cpp     # change to implementation.
+    ${IMGUI_DIR}/backends/imgui_impl_opengl3.cpp # change to implementation.
     ${IMGUI_DIR}/examples/libs/gl3w/GL/gl3w.c
 )
 
