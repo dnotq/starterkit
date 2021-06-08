@@ -1,10 +1,15 @@
-#
-# Starter Kit executable target.
+##
+# Starter Kit Executable.
 #
 
-add_executable(starterkit
-    starterkit.c
-    sk_gui.cpp
+set(EXEC_NAME "starterkit")
+
+
+# Files to build the executable.
+add_executable(${EXEC_NAME}
+    disco.cpp
+    program.c
+    wrap_c2cpp.cpp
     ${IMGUI_DIR}/imgui_demo.cpp # remove if not needed.
     ${IMGUI_DIR}/imgui.cpp
     ${IMGUI_DIR}/imgui_widgets.cpp
@@ -15,37 +20,37 @@ add_executable(starterkit
     ${IMGUI_DIR}/examples/libs/gl3w/GL/gl3w.c
 )
 
-target_compile_definitions(starterkit PRIVATE
+# This will set imgui to use STB printf replacement.
+target_compile_definitions(${EXEC_NAME} PRIVATE
     IMGUI_USE_STB_SPRINTF
 )
 
-target_include_directories(starterkit PRIVATE
-    ${SDL2_INCLUDE_DIR}
+target_include_directories(${EXEC_NAME} PRIVATE
+    ${SDL2_INC_DIR}
     ${STB_DIR}
-    ${LIBUV_DIR}/include
     ${IMGUI_DIR}
     ${IMGUI_DIR}/examples/libs/gl3w
 )
 
-target_link_libraries(starterkit
-    uv
-    ${SDL2_LIBRARIES}
+#target_link_directories(${EXEC_NAME} PRIVATE
+#    ${SDL2_LIB_DIR}
+#)
+
+target_link_libraries(${EXEC_NAME} PRIVATE
+    ${SDL2_LINK_LIBS}
     ${OPENGL_LIBRARIES}
+    ${IMGUI_LINK_LIBS}
 )
 
-
-# Windows needs the DLL with the EXE, and VS always adds the build type to
-# whatever is in CMAKE_RUNTIME_OUTPUT_DIRECTORY.  There does not seem to
-# any other way to figure out the build type when it is not specified.
-if ( WIN32 )
-    if ( NOT CMAKE_BUILD_TYPE )
-        set(WINDIR "Debug")
-    else ()
-        set(WINDIR "Release")
-    endif ()
-
-    add_custom_command(TARGET starterkit POST_BUILD
-        COMMAND ${CMAKE_COMMAND} -E copy
-        ${SDL2_DIR}/lib/${ARCHTYPE}/SDL2.dll
-        ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/${WINDIR}/SDL2.dll)
+# Windows needs the SDL2 DLL in the same directory with the EXE.
+# MSVS also adds a build-type, Debug or Release, to the output
+# directory path, i.e. build/bin/Debug/program.exe
+if ( SDL2_RUNTIME )
+    get_filename_component(SDL2_RUNTIME_NAME "${SDL2_RUNTIME}" NAME)
+    add_custom_command(TARGET ${EXEC_NAME} POST_BUILD
+        MAIN_DEPENDENCY "${SDL2_LIBRARY}"
+        BYPRODUCTS "${SDL2_RUNTIME_NAME}"
+        COMMENT "Copying SDL2 DLL"
+        COMMAND "${CMAKE_COMMAND}" -E copy "${SDL2_RUNTIME}" "$<TARGET_FILE_DIR:${EXEC_NAME}>/${SDL2_RUNTIME_NAME}"
+    )
 endif ()

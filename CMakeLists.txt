@@ -1,35 +1,105 @@
-#
-# Starter Kit base CMake.
+##
+# Starter Kit.
 #
 
 project(STARTERKIT)
 
-# The FindSDL script uses SDL2_DIR as a hint.
-set(SDL2_DIR "${CMAKE_SOURCE_DIR}/src/deps/SDL2")
-set(IMGUI_DIR "${CMAKE_SOURCE_DIR}/src/deps/imgui")
-set(LIBUV_DIR "${CMAKE_SOURCE_DIR}/src/deps/libuv")
-set(STB_DIR "${CMAKE_SOURCE_DIR}/src/deps/stb")
-
-# The minimum CMake version is actually unknown.  This build has only been
-# tested with CMake 3.16.x.
-cmake_minimum_required(VERSION 3.5.1)
+# cmake is unhappy without a required version specification.
+cmake_minimum_required(VERSION 3.5)
 set(CMAKE_COLOR_MAKEFILE ON)
+
+#if (WIN32) #to mingw work as all the others
+#    set(CMAKE_SHARED_LIBRARY_PREFIX "")
+#endif ()
+
+# Designate a binary directory.
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR}/bin)
 
-# Add the project directory to the module path so FindSDL will be picked up.
-set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}")
-
-find_package(SDL2 REQUIRED)
-find_package(OpenGL REQUIRED)
-
-set(CMAKE_CXX_FLAGS "-O2")
-
-# Detect the architecture type.
-if ( CMAKE_SIZEOF_VOID_P EQUAL 8 )
-    set(ARCHTYPE "x64")
+# Compiler options
+if (MSVC)
+    set(CMAKE_CXX_FLAGS "-W4 -O2")
 else ()
-    set(ARCHTYPE "x86")
+    set(CMAKE_CXX_FLAGS "-Wall -Wextra -O2")
 endif ()
 
-add_subdirectory(${LIBUV_DIR})
+##
+# Dependency locations.
+set(IMGUI_DIR "${CMAKE_SOURCE_DIR}/src/deps/imgui")
+set(STB_DIR "${CMAKE_SOURCE_DIR}/src/deps/stb")
+
+##
+# SDL2
+#
+# Must set:
+#
+# SDL2_BASE_DIR   base location of SDL2.
+# SDL2_INC_DIR    proper SDL convention is #include "SDL.h", not <SDL2/SDL.h>.
+# SDL2_LIB_DIR    link-time library directory.
+# SDL2_RUNTIME    run-time DLL if needed (MinGW/Windows), otherwise leave empty.
+
+if (MINGW)
+    # MinGW
+    set(SDL2_BASE_DIR "${CMAKE_SOURCE_DIR}/src/deps/SDL2_mingw_2_0_14/x86_64-w64-mingw32")
+    set(SDL2_INC_DIR "${SDL2_BASE_DIR}/include/SDL2")
+    set(SDL2_LIB_DIR "${SDL2_BASE_DIR}/lib")
+    set(SDL2_RUNTIME "${SDL2_BASE_DIR}/bin/SDL2.dll")
+
+elseif (MSVC)
+    # Windows
+    set(SDL2_BASE_DIR "${CMAKE_SOURCE_DIR}/src/deps/SDL2_vc_2_0_14")
+    set(SDL2_INC_DIR "${SDL2_BASE_DIR}/include")
+    set(SDL2_LIB_DIR "${SDL2_BASE_DIR}/lib/x64")
+    set(SDL2_RUNTIME "${SDL2_BASE_DIR}/lib/x64/SDL2.dll")
+
+elseif (APPLE)
+    # TODO MACOS
+
+else ()
+    # Unix
+    set(SDL2_BASE_DIR "/usr/local")
+    set(SDL2_INC_DIR "${SDL2_BASE_DIR}/include/SDL2")
+    set(SDL2_LIB_DIR "${SDL2_BASE_DIR}/lib")
+    set(SDL2_RUNTIME "")
+
+endif ()
+
+# Find the full paths to the SDL2 libs, which is the recommended practice.
+find_library(SDL2_LIB_MAIN
+    NAMES SDL2main
+    HINTS ${SDL2_LIB_DIR})
+find_library(SDL2_LIB_SDL2
+    NAMES SDL2
+    HINTS ${SDL2_LIB_DIR})
+
+# Decision tree, again, to assemble the libs in the correct order.
+if (MINGW)
+	# Final link for MinGW should be: -lmingw32 -lSDL2main -lSDL2 -mwindows
+	set(SDL2_LINK_LIBS "-lmingw32" ${SDL2_LIB_MAIN} ${SDL2_LIB_SDL2} "-mwindows")
+
+elseif (MSVC)
+	set(SDL2_LINK_LIBS ${SDL2_LIB_MAIN} ${SDL2_LIB_SDL2})
+
+elseif (APPLE)
+    # Untested, not sure if this is correct to MACOS.
+	# Might need -framework CoreFoundation
+	set(SDL2_LINK_LIBS "-framework Cocoa" ${SDL2_LIB_MAIN} ${SDL2_LIB_SDL2})
+
+else ()
+	set(SDL2_LINK_LIBS ${SDL2_LIB_MAIN} ${SDL2_LIB_SDL2})
+endif ()
+
+# SDL2
+##
+
+find_package(OpenGL REQUIRED)
+
+if (MINGW)
+    # Fix undefined references to:
+	# 'ImmGetContext' 'ImmSetCompositionWindow' 'ImmReleaseContext'
+	set(IMGUI_LINK_LIBS "Imm32")
+endif ()
+
+
+
+# Include the source files.
 add_subdirectory(src)

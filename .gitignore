@@ -7,6 +7,8 @@ src/deps/*
 
 # Build directory.
 build/
+build_unix/
+build_win/
 
 # Eclipse project files.
 .project

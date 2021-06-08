@@ -55,7 +55,7 @@ using namespace gl;
 #include "stb_sprintf.h"    // stbsp_snprintf
 
 // This header includes the declarations for the public GUI API functions.
-#include "starterkit.h"
+#include "program.h"
 
 // The header can be built with the utility included with IMGUI.  See below.
 #include "cousine_font.h"
