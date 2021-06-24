@@ -1,11 +1,11 @@
 /**
- * @file wrap_c2cpp.h
+ * @file cpp_stuff.h
  * @date Jun 5, 2021
  * @author Matthew Hagerty
  */
 
-#ifndef SRC_WRAP_C2CPP_H_
-#define SRC_WRAP_C2CPP_H_
+#ifndef SRC_CPP_STUFF_H_
+#define SRC_CPP_STUFF_H_
 
 #include "program.h"
 
@@ -15,11 +15,10 @@ extern "C" {
 #endif
 
 
-void imgui_ShowDemoWindow(u32 *show);
-
+void imgui_draw(progdata_s *pd);
 
 #ifdef __cplusplus
 }
 #endif
 
-#endif /* SRC_WRAP_C2CPP_H_ */
+#endif /* SRC_CPP_STUFF_H_ */

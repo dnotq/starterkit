@@ -17,9 +17,26 @@ set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR}/bin)
 
 # Compiler options
 if (MSVC)
-    set(CMAKE_CXX_FLAGS "-W4 -O2")
+    # -MT to include C/C++ runtime which will prevent dll not found errors on different
+    # versions of Windows, and prevent needing to distribute a "C++ runtime".
+    set(CMAKE_CXX_FLAGS "-W4 -O2 -MT")
+    # -subsystem:windows,5.01 will allow running on WinXP and above.
+    # This option controls if a console window is opened when running.  Even if run  from
+    # the command line, without this option the program will not have a stdout.
+    # Minimums: 5.01 (x86), 5.02 (x64), 6.02 (ARM)
+    #set(CMAKE_EXE_LINKER_FLAGS "-subsystem:windows,5.02")
+    set(CMAKE_EXE_LINKER_FLAGS "-subsystem:windows")
+elseif (MINGW)
+    # The -static option prevents needing to include the MinGW dlls with the exe.
+    set(CMAKE_CXX_FLAGS "-Wall -Wextra -O2 -static")
+    #set(CMAKE_CXX_FLAGS "-Wall -Wextra -g -static")
+    # TODO linker flags as necessary.
+    #set(CMAKE_EXE_LINKER_FLAGS "")
 else ()
+    # TODO other switches for MacOS.
     set(CMAKE_CXX_FLAGS "-Wall -Wextra -O2")
+    # TODO linker flags as necessary.
+    #set(CMAKE_EXE_LINKER_FLAGS "")
 endif ()
 
 ##

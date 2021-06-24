@@ -9,12 +9,8 @@
 #include <stdio.h>	// NULL, stdout, fwrite
 #include "SDL.h"
 #include "program.h"
-#include "wrap_c2cpp.h"
-
-// The stb_sprintf implementation is included by IMGUI when STB use is enabled
-// by defining IMGUI_USE_STB_SPRINTF, which is done in the CMakeFiles.txt.
-//#define STB_SPRINTF_IMPLEMENTATION
 #include "stb_sprintf.h"    // stbsp_snprintf
+#include "cpp_stuff.h"
 
 
 #define APP_NAME  "Starter Kit"  ///< Application name.
@@ -26,13 +22,17 @@
 
 
 // Call-back and thread functions.
-static s32 main_program(void *arg);
-static s32 draw(void *arg);
 static s32 cleanup(void *arg);
+static s32 main_program(void *arg);
+static s32 events(void *arg);
+static s32 draw(void *arg);
 
 
 /**
  * Program initialization, called by disco.
+ *
+ * This function is not a call-back per se, disco will call this function by
+ * name to do program data initialization.
  *
  * @param[in] pd  Pointer to the program data structure.
  *
@@ -44,14 +44,6 @@ program_init(progdata_s *pd)
    s32 rtn = XYZ_ERR;
 
    XYZ_BLOCK
-
-   // Set up SDL.
-   if ( SDL_Init(SDL_INIT_EVERYTHING) != 0 )
-   {
-//       SK_LOG_CRIT(app, "%s", SDL_GetError());
-       printf("%s", SDL_GetError());
-       XYZ_BREAK
-   }
 
 
    // TODO Find the database:
@@ -65,6 +57,10 @@ program_init(progdata_s *pd)
    // Set up the window.
    // TODO get location from database.
    // TODO make sure the window is visible on a screen somewhere.
+
+   // Use the IMGUI built-in ini capability for now.
+   pd->imgui_ini_filename = "starterkit.ini";
+
    pd->winpos.x = SDL_WINDOWPOS_CENTERED;
    pd->winpos.y = SDL_WINDOWPOS_CENTERED;
    pd->winpos.w = WINDOW_WIDTH;
@@ -73,6 +69,9 @@ program_init(progdata_s *pd)
    pd->ver_major = VER_MAJOR;
    pd->ver_minor = VER_MINOR;
 
+
+   // The program name is a "metadata" type.  Still experimental until some
+   // support functions are written.
    pd->prg_name.format = XYZ_META_F_POINTER;
    pd->prg_name.alloc  = XYZ_META_P_DYNAMIC;
    pd->prg_name.type   = XYZ_META_T_ASCII_VARCHAR;
@@ -80,20 +79,20 @@ program_init(progdata_s *pd)
    pd->prg_name.buf.vp = xyz_malloc(pd->prg_name.byte_dim);
    if ( pd->prg_name.buf.vp == NULL ) {
       pd->prg_name.byte_dim = 0;
-      XYZ_BREAK;
+   } else {
+      pd->prg_name.unit_dim = pd->prg_name.byte_dim;
+      pd->prg_name.unit_len = stbsp_snprintf(
+            pd->prg_name.buf.vp, pd->prg_name.unit_dim, "%s v%d.%d",
+            APP_NAME, pd->ver_major, pd->ver_minor);
+      pd->prg_name.byte_len = pd->prg_name.unit_len;
    }
-   pd->prg_name.unit_dim = pd->prg_name.byte_dim;
-   pd->prg_name.unit_len = stbsp_snprintf(pd->prg_name.buf.vp, pd->prg_name.unit_dim, "%s v%d.%d",
-         APP_NAME, pd->ver_major, pd->ver_minor);
-   pd->prg_name.byte_len = pd->prg_name.unit_len;
 
-   // Set up a main program thread to be started after initialization.
+
+   // Set up the main program thread to be started after initialization.
    pd->main_thread = main_program;
 
-   // No event call-back, for now.
-   pd->callback.event = NULL;
-
-   // Set the rendering and cleanup call-backs.
+   // Set the event, rendering, and cleanup call-backs.
+   pd->callback.event = events;
    pd->callback.draw = draw;
    pd->callback.cleanup = cleanup;
 
@@ -137,32 +136,99 @@ cleanup(void *arg)
 
 
 /**
- * Main Program Thread
+ * Main Program Thread.
  *
  * The main function to be called for the program.  Follows the SDL2 thread
- * prototype.  When this function returns, the application will exit.
+ * prototype.
+ *
+ * The program_running flag must be set to XYZ_FALSE prior to exiting in order
+ * to properly terminate the program.  The disco.running flag should also be
+ * watched, and the program exited if the flag is ever found to be XYZ_FALSE.
+ *
+ * @note DO NOT TRY TO HANDLE EVENTS IN THE THREAD-FORM OF THIS FUNCTION.  Or,
+ * rewrite the program and disco to your liking...
  *
  * @param[in] arg Pointer to the program data structure.
  *
- * @return 0
+ * @return A return value to propagate to the main exit for the program.
  */
 static s32
 main_program(void *arg)
 {
-   progdata_s *pd = (progdata_s *)arg;
-   (void)pd; // not currently used.
+   s32 rtn = 0; // unix-style return value: 0 == everything was ok.
 
-   return 0;
+   progdata_s *pd = (progdata_s *)arg;
+
+   TTYF(pd, "%s\n", (c8 *)pd->prg_name.buf.vp);
+   TTYF(pd, "Main program thread is running.\n");
+
+
+   // Put some text into the graphic console buffer.
+   CONSF(pd, "%s\n", (c8 *)pd->prg_name.buf.vp);
+   CONSF(pd, "Main program thread is running.\n\n");
+   CONSF(pd, "This is the graphic console.  Output can be written here using "
+         "the CONSF helper macro (just like printf to the TTY console).\n");
+
+
+   // Must watch the disco.running flag.
+   while ( pd->program_running == XYZ_TRUE && pd->disco.running == XYZ_TRUE )
+   {
+      // TODO lots of program kinds of stuff here.
+      SDL_Delay(100);
+
+      // TODO if the program errors, break and make sure to set
+      // program_running to XYZ_FALSE.
+   }
+
+   // Must set the program running flag to XYZ_FALSE on exit so the thread is
+   // joined properly.  Also push an event to make sure disco responds in a
+   // timely manner.
+
+   pd->program_running = XYZ_FALSE;
+
+   SDL_Event sdlevent;
+   sdlevent.type = SDL_QUIT;
+   SDL_PushEvent(&sdlevent);
+
+   return rtn;
 }
 // main_program()
+
+
+/**
+ * Event handler.
+ *
+ * @param[in] arg Pointer to the program data structure.
+ *
+ * @return XYZ_TRUE if events were handled, otherwise XYZ_FALSE;
+ */
+static s32
+events(void *arg)
+{
+   s32 handled = XYZ_FALSE;
+
+   progdata_s *pd = (progdata_s *)arg;
+
+   // Example for the event handler.
+   // The SDL event structure is pd->disco.events.
+
+   // TODO Event stuff.
+   (void)pd; // not currently used.
+
+   // Return XYZ_FALSE to allow disco to handle window exit events.
+
+   return handled;
+}
+// events()
 
 
 /**
  * Main program drawing.
  *
  * Called by the rendering thread, so it is not synchronous to the main
- * program thread, or the original "main" called by the OS.  Any kind of OpenGL,
- * IMGUI, or SDL2 drawing, etc. is ok here.
+ * program thread, or the original "main" called by the OS.
+ *
+ * Set to align with VSYNC, so this function is called at the system frame rate.
  *
  * @param[in] arg Pointer to the program data structure.
  *
@@ -172,12 +238,12 @@ static s32
 draw(void *arg)
 {
    progdata_s *pd = (progdata_s *)arg;
-   (void)pd; // not currently used.
 
-   // All program drawing goes here.
+   // This is a little convoluted to turn around and call another function,
+   // but the goal is mostly C, and IMGUI is C++, so all that kind of code will
+   // have to go into the C++ part.
 
-   static u32 show_demo_window = 1;
-   imgui_ShowDemoWindow(&show_demo_window);
+   imgui_draw(pd);
 
    return 0;
 }

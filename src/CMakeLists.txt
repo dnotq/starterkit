@@ -9,7 +9,8 @@ set(EXEC_NAME "starterkit")
 add_executable(${EXEC_NAME}
     disco.cpp
     program.c
-    wrap_c2cpp.cpp
+    cpp_stuff.cpp
+    xyz.c
     ${IMGUI_DIR}/imgui_demo.cpp # remove if not needed.
     ${IMGUI_DIR}/imgui.cpp
     ${IMGUI_DIR}/imgui_widgets.cpp

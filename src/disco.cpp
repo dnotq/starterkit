@@ -39,16 +39,18 @@
  * @date April 23, 2021
  */
 
+
 #include <stdio.h>   // NULL, stdout, fwrite, fflush
+#include "SDL.h"
+//#include "SDL_opengl.h" // Do not use with OpenGL3 / GL3W
+
 
 // IMGUI has pre-build wrappers for many graphics subsystems.
 #define IMGUI_IMPL_OPENGL_LOADER_GL3W
 #include "imgui.h"
-#include "backends/imgui_impl_sdl.h"
 #include "backends/imgui_impl_opengl3.h"
+#include "backends/imgui_impl_sdl.h"
 
-#include "SDL.h"
-//#include "SDL_opengl.h" // Do not use with OpenGL3 / GL3W
 
 // OpenGL 3.x complicates things compared to using OpenGL 2.x.
 //
@@ -98,8 +100,8 @@ using namespace gl;
 
 static s32 disco(progdata_s *pd);
 static s32 render_thread(void *arg);
-static s32 out_tty(const c8 *text, u32 len);
-static s32 out_cons(const c8 *text, u32 len);
+static u32 out_tty(void *arg, const c8 *text, u32 len);
+static u32 out_cons(void *arg, const c8 *text, u32 len);
 
 
 /**
@@ -119,7 +121,7 @@ main(int argc, char *argv[])
    (void)argc;
    (void)argv;
 
-   // Allocate the program data.
+   // Allocate the program data and zero all fields.
    progdata_s *pd = (progdata_s *)xyz_calloc(1, sizeof(progdata_s));
 
    XYZ_BLOCK
@@ -131,16 +133,35 @@ main(int argc, char *argv[])
    // Default initialization.
    pd->tty.buf = (c8 *)xyz_malloc(TTY_LINEBUF_DIM);
    pd->cons.buf = (c8 *)xyz_malloc(CONS_BUF_DIM);
+   pd->cons.linelist = (consline_s *)xyz_calloc(CONS_LINELIST_DIM, sizeof(consline_s));
+   pd->cons.mutex = SDL_CreateMutex();
+   pd->cons.lockfailures = 0;
 
-   if ( pd->tty.buf == NULL || pd->cons.buf == NULL ) {
+   if (
+      pd->tty.buf == NULL ||
+      pd->cons.buf == NULL ||
+      pd->cons.linelist == NULL ||
+      pd->cons.mutex == NULL ) {
       XYZ_BREAK
    }
 
    pd->tty.bufdim = TTY_LINEBUF_DIM;
    pd->cons.bufdim = CONS_BUF_DIM;
+   xyz_rbam_init(&(pd->cons.rbam), CONS_LINELIST_DIM);
 
    pd->tty.out = out_tty;
    pd->cons.out = out_cons;
+
+   // Set up SDL.
+   if ( SDL_Init(SDL_INIT_EVERYTHING) != 0 )
+   {
+      SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, "Program using SDL2",
+            "Something really basic failed.  Cannot continue, sorry.", NULL);
+      const char *sdlerr = SDL_GetError();
+      TTYF(pd, "%s:%d SDL_Init(SDL_INIT_EVERYTHING) failed with: [%s]\n",
+            XYZ_CFL, sdlerr);
+      XYZ_BREAK
+   }
 
 
    // Program initialization.
@@ -149,29 +170,38 @@ main(int argc, char *argv[])
    }
 
 
-   TTYF(pd, "%.*s\n", pd->prg_name.unit_len, (c8 *)pd->prg_name.buf.vp);
-
-
    // Run the program.
-   disco(pd);
+   rtn = disco(pd);
 
    if ( pd->callback.cleanup != NULL ) {
       pd->callback.cleanup(pd);
    }
 
-   rtn = 0;
    XYZ_END
 
 
    // Memory cleanup.
    if ( pd != NULL )
    {
+      if ( pd->cons.lockfailures != 0 ) {
+         TTYF(pd, "Warning: Console mutex lock failure count: %u\n",
+               pd->cons.lockfailures);
+      }
+
       if ( pd->tty.buf != NULL ) {
          xyz_free(pd->tty.buf);
       }
 
       if ( pd->cons.buf != NULL ) {
          xyz_free(pd->cons.buf);
+      }
+
+      if ( pd->cons.linelist != NULL ) {
+         xyz_free(pd->cons.linelist);
+      }
+
+      if ( pd->cons.mutex != NULL ) {
+         SDL_DestroyMutex(pd->cons.mutex);
       }
 
       xyz_free(pd);
@@ -192,7 +222,7 @@ main(int argc, char *argv[])
 static s32
 disco(progdata_s *pd)
 {
-   s32 rtn = XYZ_OK;
+   s32 rtn = XYZ_ERR;
 
    // Decide GL+GLSL versions
 #if defined(IMGUI_IMPL_OPENGL_ES2)
@@ -218,6 +248,10 @@ disco(progdata_s *pd)
    SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 0);
 #endif
 
+   SDL_Thread *render_h = NULL;
+   SDL_Thread *program_h = NULL;
+
+   XYZ_BLOCK
 
    SDL_WindowFlags window_flags = (SDL_WindowFlags)
          ( SDL_WINDOW_OPENGL
@@ -232,9 +266,10 @@ disco(progdata_s *pd)
          window_flags);
 
    if ( pd->disco.window == NULL ) {
-      // TODO use error block.
-      rtn = XYZ_ERR;
-      return rtn;
+      SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, (c8 *)pd->prg_name.buf.vp,
+            "Failed to create the main program window.  Cannot continue, sorry.", NULL);
+      TTYF(pd, "%s:%d SDL_CreateWindow() failed.", XYZ_CFL);
+      XYZ_BREAK
    }
 
 
@@ -245,38 +280,58 @@ disco(progdata_s *pd)
    IMGUI_CHECKVERSION();
    ImGui::CreateContext();
 
+   // Set the IMGUI ini file.
+   ImGuiIO &io = ImGui::GetIO();
+   io.IniFilename = pd->imgui_ini_filename;
+
 
    // Set the running flag and start the rendering thread.
    pd->disco.running = XYZ_TRUE;
    pd->disco.render_thread_running = XYZ_FALSE;
 
-   SDL_Thread *render_h;
    render_h = SDL_CreateThread(render_thread, "RenderThread", pd);
-   if ( render_h == NULL )
-   {
-      //SK_LOG_CRIT(app, "%s", SDL_GetError());
-
-      // TODO use error block.
-      rtn = XYZ_ERR;
-      return rtn;
+   if ( render_h == NULL ) {
+      SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, (c8 *)pd->prg_name.buf.vp,
+            "The pixels spilled out of the program. :(  Cannot continue.", NULL);
+      TTYF(pd, "%s:%d SDL_CreateThread(RenderThread) failed.", XYZ_CFL);
+      XYZ_BREAK
    }
 
-   // TODO Wait for rendering thread to finish initialization?
-   //app->gui.render_sem = SDL_CreateSemaphore(0);
+   // Wait for rendering thread to finish initialization.
+   u32 sanity = 300;
+   while ( pd->disco.render_thread_running == XYZ_FALSE && sanity > 0 ) {
+      SDL_Delay(10);
+      sanity--;
+   }
+
+   if ( sanity == 0 ) {
+      // The rendering thread never signaled that it started.
+      SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, (c8 *)pd->prg_name.buf.vp,
+            "The box of pixels never said hello.  Sorry, cannot continue.", NULL);
+      TTYF(pd, "%s:%d The render thread never signaled it was ready.", XYZ_CFL);
+      XYZ_BREAK
+   }
 
 
-   // This message loop is a hybrid between a game-style loop which polls, and a
-   // purely event-based loop which always blocks waiting for events.
-   //
-   // The loop will only block for a limited time waiting for events.  If no
-   // events are received it will go ahead and run through the loop once to
-   // allow non-event type activity to be performed.
-   //
-   // This format makes the loop adaptable and it becomes more responsive when
-   // there are a lot of events, i.e. a lot of user interaction, since the
-   // event-wait call will return immediately.  Where there are no events, the
-   // loop scales back to spending most of its time waiting, which keeps its
-   // CPU use low like most wait-on-event-only loops.
+   // Set the program running flag and start the program thread if specified.
+   // When this flag is set false by the program, the event loop will stop
+   // the render thread and shutdown.
+   pd->program_running = XYZ_TRUE;
+
+   if ( pd->main_thread != NULL )
+   {
+      program_h = SDL_CreateThread(pd->main_thread, "ProgramThread", pd);
+      if ( program_h == NULL )
+      {
+         SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, (c8 *)pd->prg_name.buf.vp,
+               "Could not start the program. :(  Cannot continue.", NULL);
+         TTYF(pd, "%s:%d SDL_CreateThread(ProgramThread) failed.", XYZ_CFL);
+         pd->program_running = XYZ_FALSE;
+         pd->disco.running = XYZ_FALSE;
+         XYZ_BREAK
+      }
+   }
+
 
    // Notes from IMGUI about events:
    //
@@ -289,42 +344,62 @@ disco(progdata_s *pd)
    // Generally you may always pass all inputs to IMGUI and hide them from
    // your program based on those two flags.
 
-   while ( pd->disco.running == XYZ_TRUE )
+   SDL_Event *event = &(pd->disco.event); // convenience.
+
+   while ( pd->disco.running == XYZ_TRUE && SDL_WaitEvent(event) != 0 )
    {
-      SDL_Event event;
-      SDL_ClearError();
+      pd->disco.event_counter++;
+      ImGui_ImplSDL2_ProcessEvent(event);
 
-      while ( pd->disco.running == XYZ_TRUE && SDL_WaitEvent(&event) != 0 )
+      // Give the program event call-back a chance to handle events first.
+      s32 handled = XYZ_FALSE;
+      if ( pd->callback.event != NULL ) {
+         handled = pd->callback.event(pd);
+      }
+
+      if ( handled == XYZ_FALSE )
       {
-         pd->disco.event_counter++;
-         ImGui_ImplSDL2_ProcessEvent(&event);
-
          // Check for quit or main window close events.
-         if ( event.type == SDL_QUIT ) {
+         if ( event->type == SDL_QUIT ) {
             pd->disco.running = XYZ_FALSE;
          }
 
-         if ( event.type == SDL_WINDOWEVENT &&
-              event.window.event == SDL_WINDOWEVENT_CLOSE &&
-              event.window.windowID == SDL_GetWindowID(pd->disco.window) ) {
+         if ( event->type == SDL_WINDOWEVENT &&
+              event->window.event == SDL_WINDOWEVENT_CLOSE &&
+              event->window.windowID == SDL_GetWindowID(pd->disco.window) ) {
             pd->disco.running = XYZ_FALSE;
          }
+      }
 
-         if ( pd->callback.event != NULL ) {
-            pd->callback.event(pd);
-         }
+      // Check for program exit.
+      if ( pd->program_running == XYZ_FALSE ) {
+         pd->disco.running = XYZ_FALSE;
       }
    }
 
+   rtn = XYZ_OK;
+   XYZ_END
 
-   // TODO revisit the semaphore use.
-   //SDL_SemPost(app->gui.render_sem);
-   s32 render_rtn;
-//   SK_LOG_DBG(app, "Waiting for render thread to exit.");
-   SDL_WaitThread(render_h, &render_rtn);
-//   SK_LOG_DBG(app, "Render thread joined.");
 
-   SDL_DestroyWindow(pd->disco.window);
+   if ( render_h != NULL ) {
+      s32 render_rtn;
+      SDL_WaitThread(render_h, &render_rtn);
+   }
+
+   if ( program_h != NULL )
+   {
+      s32 program_rtn;
+      SDL_WaitThread(program_h, &program_rtn);
+      if ( rtn == XYZ_OK ) {
+         // If there was no internal error, pass the program return value back.
+         rtn = program_rtn;
+      }
+   }
+
+   if ( pd->disco.window != NULL ) {
+      SDL_DestroyWindow(pd->disco.window);
+   }
+
    SDL_Quit();
 
    return rtn;
@@ -341,24 +416,35 @@ disco(progdata_s *pd)
  *
  * @param[in] arg Pointer to the program data structure.
  *
- * @return 0 on successful termination, otherwise a non-zero error code.
+ * @return XYZ_OK on success, otherwise XYZ_ERR;
  */
 static s32
 render_thread(void *arg)
 {
+   s32 rtn = XYZ_ERR;
+
    if ( arg == NULL ) {
-      return 1;
+      return rtn;
    }
 
    // Set up a program data pointer.
    progdata_s *pd = (progdata_s *)(arg);
 
-   //SK_LOG_DBG(app, "Render thread started.");
 
+   XYZ_BLOCK
 
    // Create the OpenGL context and bind it to the main window.
-   SDL_GLContext gl_context = SDL_GL_CreateContext(pd->disco.window);
-   SDL_GL_MakeCurrent(pd->disco.window, gl_context);
+   pd->disco.gl_context = SDL_GL_CreateContext(pd->disco.window);
+   if ( pd->disco.gl_context == NULL ) {
+      SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, (c8 *)pd->prg_name.buf.vp,
+            "Could not talk the to graphics card.  Cannot continue, sorry.", NULL);
+      const char *sdlerr = SDL_GetError();
+      TTYF(pd, "%s:%d SDL_GL_CreateContext() failed with: [%s]\n",
+            XYZ_CFL, sdlerr);
+      XYZ_BREAK
+   }
+
+   SDL_GL_MakeCurrent(pd->disco.window, pd->disco.gl_context);
 
    const s32 UPDATE_WITH_VSYNC = 1;
    SDL_GL_SetSwapInterval(UPDATE_WITH_VSYNC);
@@ -383,9 +469,10 @@ render_thread(void *arg)
 
    if ( gl_init_err == true )
    {
-      //SK_LOG_CRIT(app, "Failed to initialize OpenGL loader.");
-      // TODO errors and returns.
-      return 2;
+      SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, (c8 *)pd->prg_name.buf.vp,
+            "Could not load important graphics.  Cannot continue, sorry.", NULL);
+      TTYF(pd, "%s:%d Failed to load OpenGL functions.\n", XYZ_CFL);
+      XYZ_BREAK
    }
 
 
@@ -401,7 +488,7 @@ render_thread(void *arg)
    style.FrameRounding = 3.0;
 
    // Set up ImGui platform and renderer bindings.
-   ImGui_ImplSDL2_InitForOpenGL(pd->disco.window, gl_context);
+   ImGui_ImplSDL2_InitForOpenGL(pd->disco.window, pd->disco.gl_context);
    ImGui_ImplOpenGL3_Init(pd->disco.glsl_version);
 
 
@@ -479,30 +566,22 @@ render_thread(void *arg)
       // render-loop at a constant frame rate.
       SDL_GL_SwapWindow(pd->disco.window);
       pd->disco.render_counter++;
-
-
-      // TODO Wait for a render update event. (does this work?)
-      // TODO SDL_SemWaitTimeout() to create a polling render loop.
-      //SDL_SemWait(app->gui.render_sem);
-
-      // A delay helps keep CPU use a little lower (~ 10% vs 20%), and should
-      // not affect the frame rate unless the frame calculation time is getting
-      // close to the actual frame rate.  Can be removed if CPU use is of no
-      // no concern or there is an impact to performance.
-      // TODO work on a better solution than sleep, like the above signal or
-      // at least an interruptible timeout.  Adapt based on render time maybe?
-      //SDL_Delay(10);
    }
 
+   rtn = XYZ_OK;
+
+   XYZ_END
 
    // Cleanup.
    ImGui_ImplOpenGL3_Shutdown();
    ImGui_ImplSDL2_Shutdown();
    ImGui::DestroyContext();
 
-   SDL_GL_DeleteContext(gl_context);
+   if ( pd->disco.gl_context != NULL ) {
+      SDL_GL_DeleteContext(pd->disco.gl_context);
+   }
 
-   return 0;
+   return rtn;
 }
 // render_thread()
 
@@ -510,31 +589,202 @@ render_thread(void *arg)
 /**
  * Write to the default TTY, usually stdout.
  *
+ * @param[in] arg    Pointer to the program data structure.
  * @param[in] text   The text to write.
  * @param[in] len    The length of text.
  *
  * @return The value of len on success, otherwise less than len.
  */
-static s32
-out_tty(const c8 *text, u32 len)
+static u32
+out_tty(void *arg, const c8 *text, u32 len)
 {
-   s32 rtn = (s32)len;
+   progdata_s *pd = (progdata_s *)arg;
+   (void)pd; // not currently used.
+
+   size_t rtn = len;
 
    if ( rtn > 0 ) {
       rtn = fwrite(text, len, 1, stdout);
       fflush(stdout);
    }
 
-   return rtn;
+   // The return value cannot be larger than len, so casting is fine.
+   return (u32)rtn;
 }
 // out_tty()
 
 
-static s32
-out_cons(const c8 *text, u32 len)
+/**
+ * Write to the console buffer.
+ *
+ * TODO Handle UTF8.
+ *
+ * This is a line-oriented buffer, so input text will be split on newline
+ * as well as lines longer than a maximum number of characters.
+ *
+ * @param[in] arg    Pointer to the program data structure.
+ * @param[in] text   The text to write.
+ * @param[in] len    The length of text.
+ *
+ * @return The value of len on success, otherwise less than len.
+ */
+static u32
+out_cons(void *arg, const c8 *text, u32 len)
 {
-   s32 rtn = fwrite(text, len, 1, stdout);
-   fflush(stdout);
-   return rtn;
+   progdata_s *pd = (progdata_s *)arg;
+
+   s32 locked = -1;
+
+   XYZ_BLOCK
+
+   if ( len == 0 || text == NULL || *text == XYZ_NTERM ) {
+      len = 0;
+      XYZ_BREAK
+   }
+
+   // This is a console log and should be quick, so refuse lines longer than 4x
+   // the maximum single line length.  If support for huge blobs of text is
+   // desired, this is not the implementation to use.
+   if ( len > (CONS_MAX_LINE * 4) ) {
+      len = CONS_MAX_LINE * 4;
+   }
+
+   // The design is a ring-buffer list of line positions and lengths, and a
+   // byte buffer holding the line data.
+   //
+   // Both the line list and buffer are fixed arrays, so which ever buffer
+   // fills up first determines how many lines there are for display.
+
+
+   locked = SDL_TryLockMutex(pd->cons.mutex);
+   if ( locked != 0 )
+   {
+      pd->cons.lockfailures++;
+
+      // Yield and wait the minimum time, and try the lock once more.
+      SDL_Delay(1);
+      locked = SDL_TryLockMutex(pd->cons.mutex);
+
+      if ( locked != 0 ) {
+         pd->cons.lockfailures++;
+         XYZ_BREAK
+      }
+   }
+
+
+   u32 idx = 0;
+   u32 linelen = 0;
+   u32 start_idx = 0;
+   while ( idx < len )
+   {
+      // Set up for the next line.
+      linelen = 0;
+      start_idx = idx;
+
+      while ( linelen < CONS_MAX_LINE )
+      {
+         if ( text[idx] == XYZ_NTERM ) {
+            // A terminator will end the input even if the length was specified
+            // as being longer.  This is not a binary-safe buffer.
+            len = idx;
+            break;
+         }
+
+         if ( text[idx] == '\n' || text[idx] == '\r' )
+         {
+            // Include the EOL byte.
+            idx++;
+            linelen++;
+
+            if ( idx < len && text[idx - 1] == '\r' && text[idx] == '\n' ) {
+               // Check for and include a CRLF pair.
+               idx++;
+               linelen++;
+            }
+
+            break;
+         }
+
+         idx++;
+         linelen++;
+      }
+
+      // A terminator will be added to the line to prevent buffer overflows
+      // and make it compatible with other functions that expect / need
+      // terminated buffers.
+      linelen += 1;
+
+      // Sanity.
+      if ( linelen > pd->cons.bufdim ) {
+         continue;
+      }
+
+      // Convenience.
+      consline_s *list = pd->cons.linelist;
+      u32 *rd = &(pd->cons.rbam.rd);
+      u32 *wr = &(pd->cons.rbam.wr);
+      xyz_rbam *rbam = &(pd->cons.rbam);
+
+      // If the line list is full, make room for the new line.
+      if ( xyz_rbam_is_full(rbam) == XYZ_TRUE ) {
+         xyz_rbam_read(rbam);
+      }
+
+      // Calculate the position of the end of the line in the buffer, which is
+      // also the "new position" for the line after this one.
+      u32 newpos = list[*wr].pos + linelen;
+
+      // Clear any top lines that would be overwritten by the new line.
+      while ( list[*rd].pos >= list[*wr].pos &&
+              list[*rd].pos < newpos &&
+              xyz_rbam_is_empty(rbam) == XYZ_FALSE )
+      { xyz_rbam_read(rbam); }
+
+      // Adjust the new starting location if out of bounds.
+      if ( newpos > pd->cons.bufdim )
+      {
+         // The new line will not fit in the remainder of the buffer,
+         // so restart at position 0.
+         list[*wr].pos = 0;
+         newpos = linelen;
+
+         // Clear any lines that will be overwritten by the new line.
+         while ( list[*rd].pos < newpos &&
+                 xyz_rbam_is_empty(rbam) == XYZ_FALSE )
+         { xyz_rbam_read(rbam); }
+      }
+
+      // The line has been checked to be shorter than the size of the buffer.
+      list[*wr].len = linelen;
+
+
+      // The line data is (linelen - 1), since it was increased to account for
+      // the terminator that will be written in the buffer.
+      memcpy(pd->cons.buf + list[*wr].pos, text + start_idx, linelen - 1);
+
+      // Set the last reserved byte to the terminator.
+      pd->cons.buf[newpos - 1] = XYZ_NTERM;
+
+      // Indicate that a new line has been written.
+      xyz_rbam_write(rbam);
+
+      // If the line list is now full, read at least one line so the new
+      // position can be stored.
+      if ( xyz_rbam_is_full(rbam) == XYZ_TRUE ) {
+         xyz_rbam_read(rbam);
+      }
+
+      // Prepare for the next line.
+      list[*wr].pos = newpos;
+      list[*wr].len = 0;
+   }
+
+   XYZ_END
+
+   if ( locked == 0 ) {
+      SDL_UnlockMutex(pd->cons.mutex);
+   }
+
+   return len;
 }
 // out_cons()

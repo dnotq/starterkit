@@ -19,4 +19,4 @@ build_win/
 vs
 
 # IMGUI settings.
-imgui.ini
+*.ini

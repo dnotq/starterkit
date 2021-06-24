@@ -16,16 +16,29 @@
 /// buffer will be truncated.
 #define TTY_LINEBUF_DIM 2048
 
-/// The dimension of the graphical console / log buffer.
+/// The dimension of the graphical console buffer.
 #define CONS_BUF_DIM (1024 * 1024)
+
+/// The dimension of line list for the graphical console.
+#define CONS_LINELIST_DIM 10000
+
+/// Lines longer than this will be split in the graphical console buffer.
+#define CONS_MAX_LINE 512
 
 
 // The ## in front of __VA_ARGS__ is required to deal with the case where there
 // are no arguments.
 
 /// TTY formatted output (printf equivalent).
-#define TTYF(pd, fmt, ...) {s32 len = stbsp_snprintf(pd->tty.buf, pd->tty.bufdim, fmt, ##__VA_ARGS__); \
-   pd->tty.out(pd->tty.buf, len);}
+#define TTYF(pd, fmt, ...) {s32 slen = stbsp_snprintf(pd->tty.buf, pd->tty.bufdim, fmt, ##__VA_ARGS__); \
+   u32 len = slen < 0 ? 0 : (u32)slen; len = len > pd->tty.bufdim ? pd->tty.bufdim : len; \
+   pd->tty.out(pd, pd->tty.buf, len);}
+
+
+/// Console buffer formatted output (printf equivalent).
+#define CONSF(pd, fmt, ...) {s32 slen = stbsp_snprintf(pd->tty.buf, pd->tty.bufdim, fmt, ##__VA_ARGS__); \
+   u32 len = slen < 0 ? 0 : (u32)slen; len = len > pd->tty.bufdim ? pd->tty.bufdim : len; \
+   pd->cons.out(pd, pd->tty.buf, len);}
 
 
 
@@ -40,7 +53,14 @@ extern "C" {
 typedef s32 (callback_fn)(void *arg);
 
 /// Text logging, console, tty function prototype.
-typedef s32(out_fn)(const c8 *text, u32 len);
+typedef u32(out_fn)(void *arg, const c8 *text, u32 len);
+
+/// Console log line.
+typedef struct unused_tag_consline_s
+{
+   u32 pos; ///< Position in the buffer where the line starts.
+   u32 len; ///< Length of the line.
+} consline_s;
 
 
 /// Program Data Structure.
@@ -56,6 +76,7 @@ typedef struct unused_tag_progdata_s
    s32 h;                     ///< Window height.
    } winpos;                  ///< Initial window position and size information.
 
+   s32 program_running;       ///< Flag that the program is running.
    callback_fn *main_thread;  ///< Main program thread, optional.
    struct {
    callback_fn *event;        ///< Event call-back, optional.
@@ -63,13 +84,17 @@ typedef struct unused_tag_progdata_s
    callback_fn *cleanup;      ///< Cleanup call-back, optional.
    } callback;                ///< Call-back functions.
 
+   c8 *imgui_ini_filename;    ///< Set to NULL to disable, otherwise a filename.
+
    // ^^ Prorgram data above. ^^
    // --------------------------
    // vv Support data below.  vv
 
    struct {
    SDL_Window *window;                 ///< Pointer to the main application window.
+   SDL_GLContext gl_context;           ///< Pointer to the OpenGL SDL context.
    const c8   *glsl_version;           ///< GLSL version string.
+   SDL_Event   event;                  ///< Main process event structure.
    s32         running;                ///< Flag that disco is running.
    s32         render_thread_running;  ///< Flag that the rendering thread is running.
    u64         render_time_us;         ///< Frame rendering time in microseconds.
@@ -84,10 +109,13 @@ typedef struct unused_tag_progdata_s
    } tty;                        ///< Output to stdout / terminal / shell.
 
    struct {
-      out_fn  *out;              ///< Output function for the console.
-      c8      *loc;              ///< Current location in the buffer.
-      c8      *buf;              ///< Console buffer.
-      u32      bufdim;           ///< Dimension of the buffer.
+      out_fn     *out;           ///< Output function for the console.
+      c8         *buf;           ///< Console buffer.
+      u32         bufdim;        ///< Dimension of the buffer.
+      consline_s *linelist;      ///< Ring buffer list of lines.
+      xyz_rbam    rbam;          ///< Ring buffer manager for the line list.
+      SDL_mutex  *mutex;         ///< Mutex to make the console thread safe.
+      u32         lockfailures;  ///< Number of times a mutex lock failed.
    } cons;                       ///< Internal console and log.
 
 } progdata_s;

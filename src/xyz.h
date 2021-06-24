@@ -106,7 +106,7 @@ extern "C" {
 #define XYZ_NTERM '\0'
 
 /// Current File and Line.
-#define XYZ_CFL __FILE__, __LINE__
+#define XYZ_CFL xyz_path_lastpart(__FILE__), __LINE__
 
 
 /// TODO placeholder, replace with allocator wrapper functions.
@@ -176,8 +176,45 @@ typedef struct xyz_meta_unused_tag
 } xyz_meta;
 
 
+
+const c8 * xyz_path_lastpart(const c8 *filepath);
+
+
 /// TODO Implement.
 //s32 xyz_meta_init(xyz_meta *mt, u32 type, u32 alloc);
+
+
+
+// ==========================================================================
+//
+// Single reader-writer lock-free ring buffer access manager (RBAM)
+//
+// Note: The 'used' and 'free' fields are for informational status only and may
+// be inaccurate if the reader and writer use different threads.
+//
+// ==========================================================================
+
+
+/// Ring Buffer Access Manager (RBAM) structure.
+typedef struct unused_tag_xyz_rbam {
+   u32   dim;     ///< Dimension (total number) of elements in the buffer.
+   u32   rd;      ///< Index for reading.
+   u32   wr;      ///< Index for writing.
+   u32   next;    ///< Next write index.
+   u32   used;    ///< Number of used elements in the buffer.
+   u32   free;    ///< Number of free elements in the buffer.
+} xyz_rbam;
+
+
+u32 xyz_rbam_init(xyz_rbam *rbam, u32 dim);
+u32 xyz_rbam_next(xyz_rbam *rbam, u32 index);
+u32 xyz_rbam_prev(xyz_rbam *rbam, u32 index);
+u32 xyz_rbam_is_full(xyz_rbam *rbam);
+u32 xyz_rbam_write(xyz_rbam *rbam);
+u32 xyz_rbam_is_empty(xyz_rbam *rbam);
+u32 xyz_rbam_read(xyz_rbam *rbam);
+u32 xyz_rbam_drain(xyz_rbam *rbam);
+
 
 
 #ifdef __cplusplus
