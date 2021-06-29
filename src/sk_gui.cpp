@@ -15,8 +15,8 @@
 // IMGUI has pre-build wrappers for many graphics subsystems.
 #define IMGUI_IMPL_OPENGL_LOADER_GL3W
 #include "imgui.h"
-#include "examples/imgui_impl_sdl.h"
-#include "examples/imgui_impl_opengl3.h"
+#include "backends/imgui_impl_sdl.h"
+#include "backends/imgui_impl_opengl3.h"
 
 // SDL2
 #include "SDL.h"
@@ -55,7 +55,7 @@ using namespace gl;
 #include "stb_sprintf.h"    // stbsp_snprintf
 
 // This header includes the declarations for the public GUI API functions.
-#include "starterkit.h"
+#include "program.h"
 
 // The header can be built with the utility included with IMGUI.  See below.
 #include "cousine_font.h"

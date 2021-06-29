@@ -1,9 +1,14 @@
+# The dump.
+dump/
+
 # Dependency directories.
 src/deps/*
 !src/deps/DEPENDENCIES.md
 
 # Build directory.
 build/
+build_unix/
+build_win/
 
 # Eclipse project files.
 .project
@@ -14,4 +19,7 @@ build/
 vs
 
 # IMGUI settings.
-imgui.ini
+*.ini
+
+# Windows...
+Thumbs.db
