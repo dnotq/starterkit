@@ -1,148 +1,130 @@
-# Starter Kit for Desktop Application Development.
+# Starter Kit for Cross-Platform Program Development.
 
-Provides a C/C++ starter-kit setup for cross-platform application or game
-development.  Executables created with this kit will be very small and only have
-a few DLL or SO dependencies (SDL2 and LibUV) that are not already part of a
-standard operating system.
+The Starter Kit is a small set of C/C++ files to quickly get started writing a cross-platform graphic-capable program.  An executable program created with this kit will be small and only have a few dynamic-link library (DLL for Windows) or Shared-Object (SO for Unix-like) dependencies that are not already part of the host operating system.
 
-The stock application created uses SDL2 and OpenGL3.x for graphics, IMGUI for
-the UI, and LibUV for other OS abstractions.
+The default configuration uses SDL2 and OpenGL3.x for the graphics abstraction layer, and IMGUI for widgets and controls.  C is the primary language, however since IMGUI is written using some C++ features, a C++ compiler is also required.
+
+The Starter Kit is deliberately small and does only a minimum amount of setup necessary to get a graphic-capable program running that can use a "modern" GPU (meaning, closed proprietary hardware and drivers) that requires an OS like Windows, Unix, or MAC.  A standard event-loop, rendering thread, and a main program thread are provided which makes starting a new project very similar to a basic "Hello, World" C program.  A minimal graphic console is also included, so getting text output is ready to go.  The rest is up to you.
+
+Writing programs for a personal-computer (PC) has become overly complicated, much more so than it needs to be.  While there are many "frameworks" available, using one (or more) is just "yet another layer" to be learned, become frustrated with, and locked into.  The Starter Kit attempts to provide the minimal amount of layering and dependencies necessary to start writing platform independent programs.
+
+For the impatient, where to look for stuff:
+
+- To start adding program specific code, see the `main_program()` function in `program.c`.
+- For drawing see the `draw()` call-back function in `program.c` and the `cpp_stuff.cpp` file.
+- To make IMGUI windows with widgets an controls see the `cpp_stuff.cpp` file.
+- For event handling, use the `events()` call-back function in `program.c`.
+- The actual `main()` function is in `disco.cpp`.
+
+The Starter Kit is just that, a starting point, you are expected to change it and make it your own.
+
+![Starterkit Screenshot](starterkit_shot.png "Starterkit Screenshot")
+
 
 ## Requirements
 
-- A system with OpenGL installed and available to the compiler and linker.
-- A C and C++ compiler.  For Windows, Visual Studio 2019 has been tested.
-- CMake with support for the system compiler.
+- A C and C++ compiler.  Tested: Visual Studio 2019, Msys2/MinGW64 (clang and gcc).
+- An SDL2 supported OS.
+
+Optional:
+
+- CMake.
 - Git.
 
-## Dependencies
 
-TL;DR: Clone or download the dependency libraries into the `src/deps` directory
-which should end up like this:
+## Dependencies and Build
+
+TL;DR: Clone or download the dependency libraries into the `src/deps` directory, which should end up something like this:
 
 ```
 src/deps/imgui
-src/deps/libuv
-src/deps/SDL2
+src/deps/SDL2_mingw_2_0_14 (SDL2_vc_2_0_14 for Windows, or whatever name you want.)
 src/deps/stb
 ```
 
-### The longer description:
+Edit the CMakeLists.txt file to specify the exact directory for the libraries (SDL2 mostly).
 
-The following libraries are used to provide abstraction and cross platform
-support for network, file system, graphics, sound, and user IO.  The libraries
-are all open-source and written in C (at least most of them are).
-
-Unless otherwise noted, all libraries support Unix/Win/MAC.
-
-- Download SDL2 prebuilt dev and extract to src/deps/SDL2.
-- Alternate, install SDL2 with your system package manager.(1)
-- Clone LibUV into src/deps/libuv.
-- Alternate, install LibUV2 with your system package manager.(1)
-- Clone IMGUI into src/deps/imgui.
-- Clone STB into src/deps/stb.
-- Run build_xxx for whatever platform.(2)
-
-Note(1): Even if SDL2 and LibUV are installed with package managers, the build
-and application code still need the development sources installed so the include
-header files will be available.
-
-Note(2): A Debug build is the default when not specified.  LibUV will generate a
-lot of warnings when built with VS2019 and CMake (see LibUV section below).
+Run the build script (build_win.bat or build_unix.sh) for your OS.
 
 
-## LibUV 1.x
+### Dependencies and Build, Longer Version
 
-Cross platform asynchronous file access, networking, and threads.
+The following libraries are used to provide abstraction and cross platform support.  The libraries are all open-source or public domain, and written in C or C++.
 
-- Website:  [https://libuv.org/](https://libuv.org/)
-- Clone:    [https://github.com/libuv/libuv.git](https://github.com/libuv/libuv.git)
-- Download: [https://dist.libuv.org/dist/](https://dist.libuv.org/dist/)
-- Docs:     [http://docs.libuv.org/en/v1.x/](http://docs.libuv.org/en/v1.x/)
+All libraries support Unix/Win/MAC.
 
-Notes: Build from source for Windows, build from source or install via package
-manager on Unix / Mac.
+- SDL2, download the prebuilt development version and extract to src/deps/SDL2, or install SDL2 with your system package manager.(1)
+- IMGUI, clone into src/deps/imgui.
+- STB, clone into src/deps/stb.
 
-### Windows Build:
-
-The main Starter-Kit CMakeLists.txt file adds the LibUV directory, so the LibUV
-CMakeLists.txt script will be found and executed by CMake when the Starter-Kit
-is built for the first time.  When LibUV is built this way, it currently
-generates a lot of warnings with VS2019 and VS2017 (the only two VS environments
-tested).  These builds also fail a few of the LibUV tests.  Hopefully the LibUV
-project will be fixing these warnings and bugs soon.
+Note(1): If SDL2 is installed with a package manager, be sure to include the SDL2 "development library" as well.
 
 
-## SDL2 2.x
+### SDL2 2.x
 
-Provides cross platform windowing, graphics, sound, events, and user I/O.
+Provides cross platform windowing, graphics, sound, events, user I/O, threads, and file I/O.
 
 - Website:  [https://libsdl.org/](https://libsdl.org/)
 - Clone:    [http://hg.libsdl.org/SDL](http://hg.libsdl.org/SDL)
 - Download: [https://libsdl.org/download-2.0.php](https://libsdl.org/download-2.0.php)
 - Docs:     [https://wiki.libsdl.org/FrontPage](https://wiki.libsdl.org/FrontPage)
 
-Notes: Use prebuilt DLLs for Windows, install dev libs via package manager on
-unix systems.
-
-Extract the library to `src/deps/SDL2-2.x.xx` and remove the version part so the
-path is only `src/deps/SDL2`.
+Use prebuilt DLLs for Windows, install dev libs via package manager on Unix systems.
 
 
-## IMGUI
+### IMGUI
 
-Cross platform Immediate-Mode GUI with widgets.
+Cross platform Immediate-Mode widgets and controls.  Allows for very responsive programs that are easy to write.
 
 - Website:  [https://github.com/ocornut/imgui](https://github.com/ocornut/imgui)
 - Clone:    [https://github.com/ocornut/imgui.git](https://github.com/ocornut/imgui.git)
 - Docs:     [https://github.com/ocornut/imgui/tree/master/docs](https://github.com/ocornut/imgui/tree/master/docs)
 
-Notes: Included as source.
+Included as source and built as part of the program.  The project has example code and support for almost every OS and graphics abstraction layer, so feel free to use whatever you want.
 
 
-## STB
+### STB
 
-Single-file public domain (or MIT licensed) libraries for C/C++.
+Single-file public domain (or MIT licensed) libraries for C/C++.  Currently `stb_sprintf` is the main requirement from this collection.
 
 - Website:  [https://github.com/nothings/stb](https://github.com/nothings/stb)
 - Clone:    [https://github.com/nothings/stb.git](https://github.com/nothings/stb.git)
 - Docs:     See each source file.
 
-Notes: Included as source.
+Included as source and built as part of the program.
 
 ----
 
 ## Compiling
 
-Once the dependencies are set up, building the Starter-Kit can be done with one
-of the provided scripts:
+Once the dependencies are set up, edit the CMakeLists.txt file to specify the exact directory for the libraries (SDL2 mostly).  The SDL2 developer library path must be specified so it can be found by the compiler.  Most of the "FindSDL2" CMake modules out there are just overly complicated, IMO, and failed to work correctly.  It is much easier to just tell the compiler where the lib is located.
+
+Building the Starter Kit can be done with one of the provided scripts:
 
 - `build_win.bat` for Windows.
-- `build_unix.sh` for Unix or Mac.
+- `build_unix.sh` for Unix or MAC (MAC compiling / testing is a big TODO).
 
-The scripts are very basic and are just system agnostic CMake commands that do
-the following:
+The scripts are very basic and simply use the system agnostic CMake commands that do the following (build_unix or build_win, depending on which is run):
 
 ```
-$ mkdir build
-$ cd build
+$ mkdir build_unix
+$ cd build_unix
 $ cmake ..
 $ cmake --build .
 ```
 
 The final executable can be found in:
 
-- `build/bin/starterkit` on Unix / Mac
-- `build/bin/Debug/starterkit.exe` on Windows.
+- `build_unix/bin/starterkit` on Unix / Mac
+- `build_win/bin/Debug/starterkit.exe` on Windows.
 
-VS creates the Debug and Release directories inside the specified destination,
-so for a Windows build the final executable path will be `build/bin/Debug` for
-the Debug build.
+Visual Studio creates the `Debug` and `Release` directories inside the specified build directory.
 
-Windows also needs the SDL2.dll in the same directory as the executable, and the
-CMake script attempts to copy the correct (32-bit or 64-bit) SDL2.dll to the
-executable path.  If CMakes fails to copy the file, you will need to do so
-manually (see the SDL2 dependency `libs` directory).
+Windows also needs the `SDL2.dll` in the same directory as the executable, and the CMake script attempts to copy the correct (32-bit or 64-bit) `SDL2.dll` to the executable path.  If CMakes fails to copy the file, you will need to do so manually (see the SDL2 dependency `libs` directory).
+
+Program distribution should only require the executable itself and `SDL2.dll` for Windows; it is assumed that a Unix system will have the `SDL2.so` shared object installed with the system, i.e. via the package manager.
+
+The default build will statically link core libs, so when compiling with MinGW, for example, the MinGW DLLs are *not* required to be distributed with the executable.
 
 
 ----
@@ -150,64 +132,49 @@ manually (see the SDL2 dependency `libs` directory).
 
 ## Code Organization
 
-The code is roughly split into to main parts consisting of the GUI and the
-application.
+The code is roughly split into to main parts, the OS abstraction (event I/O and rendering) and the program.  The abstraction part is called `disco`, which is an attempt to be a catchy name for "Display and I/O".
 
-The SDL2 event-handler is required to run on the main process, so an SDL2
-thread is created for rendering, and a LibUV thread is created to run the
-application.  Both SDL2 and LibUV use an event-model, and application code is
-generally executed via call-backs (in the case of LibUV), or in response to
-user events (in the case of SDL2).
+The SDL2 event-handler (the message pump) is required to run on the main process, i.e. the process started by the OS when the program is run.  To create a program that is event-friendly and CPU-use friendly, a typical message pump likes to block in a system call waiting on events.
 
-The GUI and application-thread communicate via an asynchronous LibUV signal.
+Programs like games and emulators have much to do other than process user input, while typical "desktop" programs tend to be more event-driven.  So, to allow the program to do cool things other that sit an wait on user input, two additional threads are created:
+
+1. A rendering thread.  This allows the program to have a responsive interface and update the window while it is being dragged, resized, etc.
+2. A program thread.  This is essentially "the program" where all the other cool stuff happens.
+
+The program can also set up event and rendering call-back functions, which is where program-specific event handling and drawing should take place.  So, from the "program perspective" there is a main-thread, an event function, and a drawing function.  Widget and control events are mostly taken care of by IMGUI, so getting a graphic interface up and running is very quick and easy.
+
+The program organization looks something like this:
 
 ```
-main -+---> sk_gui_run()  SDL2+OpenGL3+IMGUI
-      |        |
-      |        | GUI calls to let app know of a user action.
-      |        V
-      |     sk_app_ext_signal()
-      |        |
-      |        | triggers local LibUV event loop call-back.
-      |        V
-      +---> app_thread()  LibUV
+OS
+  WinMain / SDLmain
+  main()
+    program_init() (one time pre-run initialization)
+    disco() ---creates---+--> render_thread() --calls--> draw() callback
+                         +--> program_thread()
+      event loop
+        event() callback
+
+    clean-up() callback
 ```
 
-Updates from the application to the GUI are simply via changes to application
-data that the GUI is watching and presenting.
+The rendering thread is set to synchronize with the display's vertical sync, so the `draw()` call-back will be called once per frame.  The `event()` call-back will be called any time there is a message not handled by IMGUI.  The `program_thread()` is running all the time.
 
-If a design requires both the GUI and application to update (write) the same
-data, standard synchronization techniques should be used.  Both SDL2 and LibUV
-provide synchronization abstractions that can be used.
+The graphic-context for the window is created in the render thread, so all drawing needs to happen in that thread or in functions called by that thread, like in the `draw()` call-back.
 
-### Event Loop and Rendering Thread
-
-The SDL2 event-loop runs on the main process and creates an SDL2 thread for
-rendering.  This separation, along with the application-thread, allows the
-data-model and display to be updated even if the event-loop is saturated or
-blocking.  For example, when dragging or resizing the main window on a Windows
-OS, the event loop will block and would stall a combined event+render loop.
-
-In practice an SDL2 application is meant for games and CPU use is a little high
-when compared to a traditional application.  To help with this, the render-loop
-has a sleep-delay that reduces application idle utilization to about 8% CPU
-(statistics taken from one system, a typical 2016, ~2.5GHz, x64 laptop).
 
 ----
 
 ## IMGUI Fonts
 
-IMGUI provides some true-type fonts to use instead of the single built-in
-"proggy-clean" font.
+IMGUI provides some true-type fonts to use instead of the single built-in "proggy-clean" font.
 
 - "Cousine" font has slashed zeros, so it wins.
 - "Roboto" font is also nice looking, as well as "Karla".
 
-The true-type fonts need to be converted to a header file and included in the
-source code.  IMGUI comes with a simple utility to do the conversion.
+The true-type fonts need to be converted to a header file and included in the source code.  IMGUI comes with a simple utility to do the conversion.
 
-Building and converting a font using a VS2019 command prompt (unix shell would
-just use the system compiler):
+Building and converting a font using a VS2019 command prompt (unix shell would just use the system compiler):
 
 ```
 $ cd deps/imgui/misc/fonts
@@ -220,7 +187,7 @@ $ g++ -o binary_to_compressed_c binary_to_compressed_c.cpp
 // Convert a font file to a compressed header:
 $ ./binary_to_compressed_c.exe -base85 Cousine-Regular.ttf cousine_font > cousine_font.h
 
-// Copy the font header to the app source directory and include like this:
+// Copy the font header to the primary source directory and include like this:
 #include "cousine_font.h"
 
 // Add to IMGUI with:
@@ -231,10 +198,6 @@ ImGui::GetIO().Fonts->AddFontFromMemoryCompressedBase85TTF(cousine_font_compress
 
 ## License
 
-In the spirit of the STB library, this code is in the public domain. You can do
-anything you want with it.  You have no legal obligation to do anything else,
-although I appreciate attribution.
+In the spirit of the STB library, this code is in the public domain. You can do anything you want with it.  You have no legal obligation to do anything else, although I really appreciate attribution.
 
-The code is also licensed under the MIT open source license, if you are unhappy
-about using public domain.  Every source file includes an explicit dual-license
-for you to choose from.
+The code is also licensed under the MIT open source license, if you are unhappy about using public domain.  Every source file includes an explicit dual-license for you to choose from.

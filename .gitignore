@@ -20,3 +20,6 @@ vs
 
 # IMGUI settings.
 *.ini
+
+# Windows...
+Thumbs.db

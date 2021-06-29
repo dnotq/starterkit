@@ -21,6 +21,22 @@
 static void imgui_console_window(progdata_s *pd);
 
 
+
+/// Moving point structure for the line example.
+typedef struct unused_tag_linept_s {
+   s32 x;
+   s32 y;
+   s32 dx;
+   s32 dy;
+} linept_s;
+
+/// A pair of points for a line.
+typedef struct unused_tag_pos_s {
+   ImVec2 pt1;
+   ImVec2 pt2;
+} pos_s;
+
+
 /**
  * Draw the IMGUI stuff, since it needs C++.
  *
@@ -29,107 +45,162 @@ static void imgui_console_window(progdata_s *pd);
 void
 imgui_draw(progdata_s *pd)
 {
-   (void)pd; // not currently used.
+   static bool show_gconsole = false;
+   static bool show_demo = false;
+   static bool show_ball = true;
 
+   static float speed = 0.5;
+   static u32 max_pts = 30;
 
-   // The demo is nice to have for development and documentation.
-   bool show_demo = true;
-   ImGui::ShowDemoWindow(&show_demo);
-   imgui_console_window(pd);
-
-   // Draw a bouncing box, just for fun.
-   static float x = 100.0f;
-   static float y = 100.0f;
-   const float sz = 10.0f;
-
-   static float xd = 4.2f;
-   static float yd = 7.7f;
-
+   ImGuiIO &io = ImGui::GetIO();
    ImGuiViewport *view = ImGui::GetMainViewport();
+
+   // Draw the check boxes to show the demo window and console.
+   //
+   ImGuiWindowFlags window_flags
+      = ImGuiWindowFlags_NoDecoration
+      | ImGuiWindowFlags_AlwaysAutoResize
+      | ImGuiWindowFlags_NoSavedSettings
+      | ImGuiWindowFlags_NoFocusOnAppearing
+      | ImGuiWindowFlags_NoNav
+      | ImGuiWindowFlags_NoMove
+      ;
+
+   ImGui::SetNextWindowPos(ImVec2(10.0f, 10.0f), ImGuiCond_Always);
+   ImGui::SetNextWindowBgAlpha(0.35f); // Transparent background
+   bool always_open = true;
+   if ( ImGui::Begin("Show Window Overlay", &always_open, window_flags) == true )
+   {
+      ImGui::Checkbox("GConsole", &show_gconsole);
+      ImGui::SameLine();
+      ImGui::Checkbox("Demo", &show_demo);
+      ImGui::SameLine();
+      ImGui::Checkbox("Ball", &show_ball);
+
+      ImGui::SliderInt("##Lines", (s32 *)&max_pts, 2, 300, "Lines %d");
+      ImGui::SameLine();
+      ImGui::SliderFloat("##Speed", &speed, 0.01f, 1.0f, "Speed %.2f");
+
+      ImGui::Separator();
+
+      ImGui::Text("Window Size: %.1f, %.1f", view->Size.x, view->Size.y);
+
+      if ( ImGui::IsMousePosValid() == true ) {
+         ImGui::Text("Mouse: %.1f, %.1f", io.MousePos.x, io.MousePos.y);
+      } else {
+         ImGui::Text("Mouse: N/A");
+      }
+   }
+   ImGui::End();
+
+   // The demo-window is nice to have for development and documentation.
+   if ( show_demo == true ) { ImGui::ShowDemoWindow(&show_demo); };
+   if ( show_gconsole == true ) { imgui_console_window(pd); }
+
+
+   // Draw a bouncing box on the foreground.
+   //
+   static float ballx = 100.0f;
+   static float bally = 100.0f;
+   const float ballsz = 10.0f;
+
+   static float ball_xd = 4.2f;
+   static float ball_yd = 7.7f;
+
    ImVec2 box_tl = view->Pos;
    ImVec2 box_br;
-   box_tl.x += (x - sz);
-   box_tl.y += (y - sz);
-   box_br.x = box_tl.x + (sz * 2);
-   box_br.y = box_tl.y + (sz * 2);
+   box_tl.x += (ballx - ballsz);
+   box_tl.y += (bally - ballsz);
+   box_br.x = box_tl.x + (ballsz * 2);
+   box_br.y = box_tl.y + (ballsz * 2);
 
-   ImDrawList *bg = ImGui::GetBackgroundDrawList();
-   bg->AddRectFilled(box_tl, box_br, IM_COL32(255, 0, 0, 255), 2, 0);
+   if ( show_ball == true ) {
+      ImDrawList *fg = ImGui::GetForegroundDrawList();
+      fg->AddRectFilled(box_tl, box_br, IM_COL32(255, 0, 0, 255), 2, 0);
+   }
 
-   x += xd;
-   y += yd;
+   ballx += ball_xd;
+   bally += ball_yd;
 
    ImVec2 winsz = view->Size;
-   winsz.x -= sz;
-   winsz.y -= sz;
+   winsz.x -= ballsz;
+   winsz.y -= ballsz;
 
-   if ( x < sz )      { x = sz;      xd *= -1.0; }
-   if ( x > winsz.x ) { x = winsz.x; xd *= -1.0; }
-   if ( y < sz )      { y = sz;      yd *= -1.0; }
-   if ( y > winsz.y)  { y = winsz.y; yd *= -1.0; }
-
-
-   c8 buf[40];
-   s32 len;
-   ImVec2 p(10, 10);
-   len = stbsp_snprintf(buf, sizeof(buf), "winsz: %f, %f", winsz.x, winsz.y);
-   bg->AddText(p, IM_COL32(255, 255, 0, 255), buf, (buf + len));
+   if ( ballx < ballsz )  { ballx = ballsz;  ball_xd *= -1.0; }
+   if ( ballx > winsz.x ) { ballx = winsz.x; ball_xd *= -1.0; }
+   if ( bally < ballsz )  { bally = ballsz;  ball_yd *= -1.0; }
+   if ( bally > winsz.y)  { bally = winsz.y; ball_yd *= -1.0; }
 
 
+   // Draw some graphics on the background.
+   //
+   ImDrawList *bg = ImGui::GetBackgroundDrawList();
+
+   s32 ox = 20;
+   s32 oy = 160;
+   s32 step = 20;
+   s32 size = 600;
+   u32 thickness = 2;
+
+   static xyz_rbam rbam;
+   #define PT_ARRAY 302
+   static pos_s points[PT_ARRAY];
+   static linept_s pt1;
+   static linept_s pt2;
+
+   static bool is_init = false;
+   static float rate = 1.0f;
+
+   if ( is_init == false ) {
+      memset(points, 0, sizeof(points));
+      xyz_rbam_init(&rbam, PT_ARRAY);
+      pt1.x = ox; pt1.y = oy;      pt1.dx = 0;    pt1.dy = step;
+      pt2.x = ox; pt2.y = oy+size; pt2.dx = step; pt2.dy = 0;
+      is_init = true;
+   }
+
+   if ( rate >= 1.0f )
    {
-      s32 tilesx = 20;
-      s32 tilesy = 20;
-      s32 cellsz = 30;
-      s32 offx = 40;
-      s32 offy = 100;
+      rate = 0.0f;
 
-      ImGuiIO &io = ImGui::GetIO();
-      s32 mouse_x = -1;
-      s32 mouse_y = -1;
-      if ( io.WantCaptureMouse == false && ImGui::IsMousePosValid() == true &&
-           io.MousePos.x > offx && io.MousePos.y > offy )
-      {
-          mouse_x = (s32)((io.MousePos.x - offx) / cellsz);
-          mouse_y = (s32)((io.MousePos.y - offy) / cellsz);
+      // Clear a point if necessary.
+      while ( xyz_rbam_is_full(&rbam) == XYZ_TRUE || rbam.used > max_pts ) {
+         xyz_rbam_read(&rbam);
       }
 
-      p = {10, 24};
-      len = stbsp_snprintf(buf, sizeof(buf), "x,y: %f, %f", io.MousePos.x, io.MousePos.y);
-      len = (len > 0 && len < (s32)sizeof(buf)) ? len : (s32)sizeof(buf) - 1;
-      bg->AddText(p, IM_COL32(255, 255, 0, 255), buf, (buf + len));
-      p = {10, 38};
-      len = stbsp_snprintf(buf, sizeof(buf), "mx,my: %d, %d", mouse_x, mouse_y);
-      bg->AddText(p, IM_COL32(255, 255, 0, 255), buf, (buf + len));
+      // Add a new point.
+      points[rbam.wr].pt1 = ImVec2(pt1.x, pt1.y);
+      points[rbam.wr].pt2 = ImVec2(pt2.x, pt2.y);
+      xyz_rbam_write(&rbam);
 
+      // Update the points.
+      pt1.x += pt1.dx; pt1.y += pt1.dy;
+      if ( pt1.x > ox+size ) { pt1.x = ox+size; pt1.dx = 0; pt1.dy = -step; }
+      if ( pt1.x < ox )      { pt1.x = ox     ; pt1.dx = 0; pt1.dy =  step; }
+      if ( pt1.y > oy+size ) { pt1.y = oy+size; pt1.dy = 0; pt1.dx =  step; }
+      if ( pt1.y < oy )      { pt1.y = oy     ; pt1.dy = 0; pt1.dx = -step; }
 
-      ImVec2 tpos = {view->Pos.x + offx, view->Pos.y + offy};
-      ImDrawListFlags orig_flags = bg->Flags;
-      bg->Flags = ImDrawListFlags_None;
+      pt2.x += pt2.dx; pt2.y += pt2.dy;
+      if ( pt2.x > ox+size ) { pt2.x = ox+size; pt2.dx = 0; pt2.dy = -step; }
+      if ( pt2.x < ox )      { pt2.x = ox     ; pt2.dx = 0; pt2.dy =  step; }
+      if ( pt2.y > oy+size ) { pt2.y = oy+size; pt2.dy = 0; pt2.dx =  step; }
+      if ( pt2.y < oy )      { pt2.y = oy     ; pt2.dy = 0; pt2.dx = -step; }
+   }
 
-      for ( s32 yi = 0 ; yi < tilesy ; yi++ )
-      {
-         for ( s32 xi = 0 ; xi < tilesx ; xi++ )
-         {
-            ImVec2 cell  = {tpos.x + xi * cellsz, tpos.y + yi * cellsz};
-            ImVec2 cell2 = {cell.x + cellsz, cell.y + cellsz};
+   rate += speed;
 
-            if ( mouse_x == xi && mouse_y == yi ) {
-               cell.x += 4; cell.y += 4;
-               cell2.x -= 3; cell2.y -= 3;
-               bg->AddRectFilled(cell, cell2, IM_COL32(255, 255, 0, 255), 4, 0);
-            } else {
-               bg->AddRect(cell, cell2, IM_COL32(0, 0, 255, 255), 0, 0, 1.0f);
-            }
-         }
-      }
+   // Draw the points.
+   u32 col = 255;
 
-      bg->Flags = orig_flags;
-
+   for ( u32 i = rbam.rd ; i != rbam.wr ; )
+   {
+      bg->AddLine(points[i].pt1, points[i].pt2, IM_COL32(0, 0, col, 255), thickness);
+      i = xyz_rbam_next(&rbam, i);
+      col = (col < 10) ? 255 : (col - 10);
    }
 
 }
 // imgui_draw()
-
 
 
 /**
@@ -142,9 +213,8 @@ imgui_draw(progdata_s *pd)
 static void
 imgui_console_window(progdata_s *pd)
 {
-   // TODO 840x680 console size.  Add vars in cons struct to load at startup.
-
    // Make a window for the graphic console.
+   ImGui::SetNextWindowSize(ImVec2(840, 680), ImGuiCond_FirstUseEver);
    ImGui::Begin("GConsole");
 
    ImVec2 sz = ImGui::GetWindowSize();
@@ -240,3 +310,46 @@ imgui_console_window(progdata_s *pd)
    ImGui::End();
 }
 // imgui_console_window()
+
+
+/*
+------------------------------------------------------------------------------
+This software is available under 2 licenses -- choose whichever you prefer.
+------------------------------------------------------------------------------
+ALTERNATIVE A - MIT License
+Copyright (c) 2020 Matthew Hagerty
+Permission is hereby granted, free of charge, to any person obtaining a copy of
+this software and associated documentation files (the "Software"), to deal in
+the Software without restriction, including without limitation the rights to
+use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies
+of the Software, and to permit persons to whom the Software is furnished to do
+so, subject to the following conditions:
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+------------------------------------------------------------------------------
+ALTERNATIVE B - Public Domain (www.unlicense.org)
+This is free and unencumbered software released into the public domain.
+Anyone is free to copy, modify, publish, use, compile, sell, or distribute this
+software, either in source code form or as a compiled binary, for any purpose,
+commercial or non-commercial, and by any means.
+In jurisdictions that recognize copyright laws, the author or authors of this
+software dedicate any and all copyright interest in the software to the public
+domain. We make this dedication for the benefit of the public at large and to
+the detriment of our heirs and successors. We intend this dedication to be an
+overt act of relinquishment in perpetuity of all present and future rights to
+this software under copyright law.
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN
+ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
+WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+------------------------------------------------------------------------------
+*/
