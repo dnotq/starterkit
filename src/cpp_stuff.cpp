@@ -140,7 +140,7 @@ imgui_draw(progdata_s *pd)
    s32 oy = 160;
    s32 step = 20;
    s32 size = 600;
-   u32 thickness = 2;
+   float thickness = 2.0f;
 
    static xyz_rbam rbam;
    #define PT_ARRAY 302
@@ -151,8 +151,8 @@ imgui_draw(progdata_s *pd)
    static bool is_init = false;
    static float rate = 1.0f;
 
-   if ( is_init == false ) {
-      memset(points, 0, sizeof(points));
+   if ( is_init == false )
+   {
       xyz_rbam_init(&rbam, PT_ARRAY);
       pt1.x = ox; pt1.y = oy;      pt1.dx = 0;    pt1.dy = step;
       pt2.x = ox; pt2.y = oy+size; pt2.dx = step; pt2.dy = 0;
@@ -169,8 +169,8 @@ imgui_draw(progdata_s *pd)
       }
 
       // Add a new point.
-      points[rbam.wr].pt1 = ImVec2(pt1.x, pt1.y);
-      points[rbam.wr].pt2 = ImVec2(pt2.x, pt2.y);
+      points[rbam.wr].pt1 = ImVec2((float)pt1.x, (float)pt1.y);
+      points[rbam.wr].pt2 = ImVec2((float)pt2.x, (float)pt2.y);
       xyz_rbam_write(&rbam);
 
       // Update the points.
