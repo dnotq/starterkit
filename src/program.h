@@ -12,6 +12,13 @@
 #include "xyz.h"           // Simplified unambiguous types and other helpers.
 #include "SDL.h"           // SDL_Window
 
+
+// Included in the header for early error message use.
+#define APP_NAME  "Starter Kit"  ///< Application name.
+#define VER_MAJOR 1              ///< Major version number.
+#define VER_MINOR 0              ///< Minor version number.
+
+
 /// The dimension of the TTY line buffer.  Any single message larger than this
 /// buffer will be truncated.
 #define TTY_LINEBUF_DIM 2048
@@ -30,12 +37,15 @@
 // are no arguments.
 
 /// TTY formatted output (printf equivalent).
+/// TODO Not thread-safe, need a mutex and a function.
+/// TODO Set up being able to specify the destination rather than hard-coded stdout.
 #define TTYF(pd, fmt, ...) {s32 slen = stbsp_snprintf(pd->tty.buf, pd->tty.bufdim, fmt, ##__VA_ARGS__); \
    u32 len = slen < 0 ? 0 : (u32)slen; len = len > pd->tty.bufdim ? pd->tty.bufdim : len; \
    pd->tty.out(pd, pd->tty.buf, len);}
 
 
 /// Console buffer formatted output (printf equivalent).
+/// TODO Not thread-safe, make a real function for this to use the mutex.
 #define CONSF(pd, fmt, ...) {s32 slen = stbsp_snprintf(pd->tty.buf, pd->tty.bufdim, fmt, ##__VA_ARGS__); \
    u32 len = slen < 0 ? 0 : (u32)slen; len = len > pd->tty.bufdim ? pd->tty.bufdim : len; \
    pd->cons.out(pd, pd->tty.buf, len);}
@@ -66,7 +76,8 @@ typedef struct unused_tag_consline_s
 /// Program Data Structure.
 typedef struct unused_tag_progdata_s
 {
-   xyz_meta    prg_name;      ///< Program name for the window title.
+   const c8   *prg_name;      ///< Program name for the window title.
+   xyz_meta    prg_metaname;  ///< Experimental metadata type.
    s32         ver_major;     ///< Major version number.
    s32         ver_minor;     ///< Minor version number.
    struct {
@@ -103,20 +114,30 @@ typedef struct unused_tag_progdata_s
    } disco;                            ///< DISCO (Display and IO).
 
    struct {
-      out_fn  *out;              ///< Output function for the tty.
-      c8      *buf;              ///< Output line buffer.
-      u32      bufdim;           ///< Dimension of the output line buffer.
-   } tty;                        ///< Output to stdout / terminal / shell.
+   u32      have_audio;       ///< ZYZ_TRUE if the audio subsystem is available.
+   u32      have_timer;       ///< ZYZ_TRUE if the timer subsystem is available.
+   } sdl;
 
    struct {
-      out_fn     *out;           ///< Output function for the console.
-      c8         *buf;           ///< Console buffer.
-      u32         bufdim;        ///< Dimension of the buffer.
-      consline_s *linelist;      ///< Ring buffer list of lines.
-      xyz_rbam    rbam;          ///< Ring buffer manager for the line list.
-      SDL_mutex  *mutex;         ///< Mutex to make the console thread safe.
-      u32         lockfailures;  ///< Number of times a mutex lock failed.
-   } cons;                       ///< Internal console and log.
+   out_fn  *out;              ///< Output function for the tty.
+   c8      *buf;              ///< Output line buffer.
+   u32      bufdim;           ///< Dimension of the output line buffer.
+   } tty;                     ///< Output to stdout / terminal / shell.
+
+   struct {
+   out_fn     *out;           ///< Output function for the console.
+   c8         *buf;           ///< Console buffer.
+   u32         bufdim;        ///< Dimension of the buffer.
+   consline_s *linelist;      ///< Ring buffer list of lines.
+   xyz_rbam    rbam;          ///< Ring buffer manager for the line list.
+   SDL_mutex  *mutex;         ///< Mutex to make the console thread safe.
+   u32         lockfailures;  ///< Number of times a mutex lock failed.
+   } cons;                    ///< Internal console and log.
+
+   struct {
+   c8         *buf;           ///< Buffer for error messages.
+   u32         bufdim;        ///< Dimension of the buffer.
+   } err;
 
 } progdata_s;
 

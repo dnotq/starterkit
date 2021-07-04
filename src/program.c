@@ -13,12 +13,8 @@
 #include "cpp_stuff.h"
 
 
-#define APP_NAME  "Starter Kit"  ///< Application name.
-#define VER_MAJOR 1              ///< Major version number.
-#define VER_MINOR 0              ///< Minor version number.
-
-#define WINDOW_WIDTH  960        ///< Default window width.
-#define WINDOW_HEIGHT 860        ///< Default window height.
+#define WINDOW_WIDTH  640        ///< Default window width.
+#define WINDOW_HEIGHT 800        ///< Default window height.
 
 
 // Call-back and thread functions.
@@ -70,22 +66,24 @@ program_init(progdata_s *pd)
    pd->ver_minor = VER_MINOR;
 
 
-   // The program name is a "metadata" type.  Still experimental until some
-   // support functions are written.
-   pd->prg_name.format = XYZ_META_F_POINTER;
-   pd->prg_name.alloc  = XYZ_META_P_DYNAMIC;
-   pd->prg_name.type   = XYZ_META_T_ASCII_VARCHAR;
-   pd->prg_name.byte_dim = 80;
-   pd->prg_name.buf.vp = xyz_malloc(pd->prg_name.byte_dim);
-   if ( pd->prg_name.buf.vp == NULL ) {
-      pd->prg_name.byte_dim = 0;
+   // The program name is a "metadata" type.  Still experimental, needs some
+   // support functions.
+   pd->prg_metaname.format = XYZ_META_F_POINTER;
+   pd->prg_metaname.alloc  = XYZ_META_P_DYNAMIC;
+   pd->prg_metaname.type   = XYZ_META_T_ASCII_VARCHAR;
+   pd->prg_metaname.byte_dim = 80;
+   pd->prg_metaname.buf.vp = xyz_malloc(pd->prg_metaname.byte_dim);
+   if ( pd->prg_metaname.buf.vp == NULL ) {
+      pd->prg_metaname.byte_dim = 0;
    } else {
-      pd->prg_name.unit_dim = pd->prg_name.byte_dim;
-      pd->prg_name.unit_len = stbsp_snprintf(
-            pd->prg_name.buf.vp, pd->prg_name.unit_dim, "%s v%d.%d",
+      pd->prg_metaname.unit_dim = pd->prg_metaname.byte_dim;
+      pd->prg_metaname.unit_len = stbsp_snprintf(
+            pd->prg_metaname.buf.vp, pd->prg_metaname.unit_dim, "%s v%d.%d",
             APP_NAME, pd->ver_major, pd->ver_minor);
-      pd->prg_name.byte_len = pd->prg_name.unit_len;
+      pd->prg_metaname.byte_len = pd->prg_metaname.unit_len;
+      pd->prg_name = (c8 *)pd->prg_metaname.buf.vp;
    }
+
 
 
    // Set up the main program thread to be started after initialization.
@@ -120,11 +118,11 @@ cleanup(void *arg)
 
    XYZ_BLOCK
 
-   if ( pd->prg_name.alloc == XYZ_META_P_DYNAMIC &&
-         pd->prg_name.buf.vp != NULL && pd->prg_name.byte_dim > 0 )
+   if ( pd->prg_metaname.alloc == XYZ_META_P_DYNAMIC &&
+         pd->prg_metaname.buf.vp != NULL && pd->prg_metaname.byte_dim > 0 )
    {
-      xyz_free(pd->prg_name.buf.vp);
-      pd->prg_name.byte_dim = 0;
+      xyz_free(pd->prg_metaname.buf.vp);
+      pd->prg_metaname.byte_dim = 0;
    }
 
    rtn = XYZ_OK;
@@ -159,12 +157,12 @@ main_program(void *arg)
 
    progdata_s *pd = (progdata_s *)arg;
 
-   TTYF(pd, "%s\n", (c8 *)pd->prg_name.buf.vp);
+   TTYF(pd, "%s\n", pd->prg_name);
    TTYF(pd, "Main program thread is running.\n");
 
 
    // Put some text into the graphic console buffer.
-   CONSF(pd, "%s\n", (c8 *)pd->prg_name.buf.vp);
+   CONSF(pd, "%s\n", pd->prg_name);
    CONSF(pd, "Main program thread is running.\n\n");
    CONSF(pd, "This is the graphic console.  Output can be written here using "
          "the CONSF helper macro (just like printf to the TTY console).\n");

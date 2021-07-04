@@ -94,6 +94,14 @@ using namespace gl;
 // Local private globals and function declarations.
 //
 
+/// Generic size of a window title bar.
+/// TODO Need a way to obtain this value prior to window creation.
+#define TITLEBAR_HEIGHT 48
+
+/// Buffer size for critical error messages that need to be displayed prior
+/// to window creation or during startup.
+#define ERROR_BUF_DIM 1024
+
 
 // Local private function forward declarations.
 //
@@ -121,17 +129,38 @@ main(int argc, char *argv[])
    (void)argc;
    (void)argv;
 
+   // TODO Set up memory allocator so malloc/calloc is only called once for
+   //      the entire run of the program.
+
    // Allocate the program data and zero all fields.
    progdata_s *pd = (progdata_s *)xyz_calloc(1, sizeof(progdata_s));
 
    XYZ_BLOCK
 
+   // The SDL simple message box is available even before the library has been
+   // initialized, so it can be used for error messages.  If the SDL2 DLL
+   // could not be loaded, the code would never have gotten this far.
+
    if ( pd == NULL ) {
+      SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, APP_NAME,
+            "Cannot continue: the main program data structure could not "
+            "be allocated.  Sorry.", NULL);
       XYZ_BREAK
    }
 
+   pd->err.buf = (c8 *)xyz_malloc(ERROR_BUF_DIM);
+   if ( pd->err.buf == NULL ) {
+      SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, APP_NAME,
+            "Cannot continue: the error message buffer could not "
+            "be allocated.  Ironic.", NULL);
+      XYZ_BREAK
+   }
+
+   // Temporary assignment until the progam_init() function can be called.
+   pd->prg_name = APP_NAME;
+
    // Default initialization.
-   pd->tty.buf = (c8 *)xyz_malloc(TTY_LINEBUF_DIM);
+   pd->tty.buf  = (c8 *)xyz_malloc(TTY_LINEBUF_DIM);
    pd->cons.buf = (c8 *)xyz_malloc(CONS_BUF_DIM);
    pd->cons.linelist = (consline_s *)xyz_calloc(CONS_LINELIST_DIM, sizeof(consline_s));
    pd->cons.mutex = SDL_CreateMutex();
@@ -142,6 +171,9 @@ main(int argc, char *argv[])
       pd->cons.buf == NULL ||
       pd->cons.linelist == NULL ||
       pd->cons.mutex == NULL ) {
+      SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, pd->prg_name,
+            "Cannot continue: the TTY and Console message buffer could not "
+            "be allocated.", NULL);
       XYZ_BREAK
    }
 
@@ -152,15 +184,54 @@ main(int argc, char *argv[])
    pd->tty.out = out_tty;
    pd->cons.out = out_cons;
 
-   // Set up SDL.
-   if ( SDL_Init(SDL_INIT_EVERYTHING) != 0 )
+   // TODO Find a place to write files and set up a log.  The TTY is most
+   //      likely not available in release builds.
+
+   // Set up SDL.  Initialize individual SDL subsystems for better error
+   // reporting and possible recovery.
+
+   if ( SDL_InitSubSystem(SDL_INIT_VIDEO) != 0 )
    {
-      SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, "Program using SDL2",
-            "Something really basic failed.  Cannot continue, sorry.", NULL);
+      // The video (implies events) subsystem is critical.
       const char *sdlerr = SDL_GetError();
-      TTYF(pd, "%s:%d SDL_Init(SDL_INIT_EVERYTHING) failed with: [%s]\n",
-            XYZ_CFL, sdlerr);
+      s32 errlen = stbsp_snprintf(pd->err.buf, pd->err.bufdim,
+            "Cannot continue: %s:%d SDL_InitSubSystem(SDL_INIT_VIDEO) "
+            "failed with: [%s]\n", XYZ_CFL, sdlerr);
+      SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, pd->prg_name,
+            pd->err.buf, NULL);
+      pd->tty.out(pd, pd->err.buf, errlen);
       XYZ_BREAK
+   }
+
+   // Be optimistic about subsystem initialization.
+   pd->sdl.have_audio = XYZ_TRUE;
+   pd->sdl.have_timer = XYZ_TRUE;
+
+   // Audio and timer are not critical, for now.
+   if ( SDL_InitSubSystem(SDL_INIT_AUDIO) != 0 )
+   {
+      pd->sdl.have_audio = XYZ_FALSE;
+
+      const char *sdlerr = SDL_GetError();
+      s32 errlen = stbsp_snprintf(pd->err.buf, pd->err.bufdim,
+            "Warning: %s:%d SDL_InitSubSystem(SDL_INIT_AUDIO) "
+            "failed with: [%s]\n", XYZ_CFL, sdlerr);
+      SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, pd->prg_name,
+            pd->err.buf, NULL);
+      pd->tty.out(pd, pd->err.buf, errlen);
+   }
+
+   if ( SDL_InitSubSystem(SDL_INIT_TIMER) != 0 )
+   {
+      pd->sdl.have_timer = XYZ_FALSE;
+
+      const char *sdlerr = SDL_GetError();
+      s32 errlen = stbsp_snprintf(pd->err.buf, pd->err.bufdim,
+            "Warning: %s:%d SDL_InitSubSystem(SDL_INIT_TIMER) "
+            "failed with: [%s]\n", XYZ_CFL, sdlerr);
+      SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, pd->prg_name,
+            pd->err.buf, NULL);
+      pd->tty.out(pd, pd->err.buf, errlen);
    }
 
 
@@ -202,6 +273,10 @@ main(int argc, char *argv[])
 
       if ( pd->cons.mutex != NULL ) {
          SDL_DestroyMutex(pd->cons.mutex);
+      }
+
+      if ( pd->err.buf != NULL ) {
+         xyz_free(pd->err.buf);
       }
 
       xyz_free(pd);
@@ -253,6 +328,77 @@ disco(progdata_s *pd)
 
    XYZ_BLOCK
 
+   // TODO Support for multiple monitors.
+
+   // Make sure the window size is inside the usable display area.
+   SDL_Rect usable_bounds;
+   s32 display_index = 0;
+   if ( SDL_GetDisplayUsableBounds(display_index, &usable_bounds) == 0 )
+   {
+      // TODO Currently the window size passed to SDL is the "client area" and
+      //      does not include the height of any title-bar for a window.  There
+      //      does not seem to be any way to get the title-bar size prior to
+      //      creating the window, so reduce the usable height by a conservative
+      //      amount for now.
+      //      Alternative is to check the location the first time the window is
+      //      is rendered and perform an adjustment.
+      usable_bounds.h -= TITLEBAR_HEIGHT;
+      usable_bounds.y += TITLEBAR_HEIGHT;
+
+      if ( pd->winpos.h > usable_bounds.h )
+      {
+         // Clamp to the window usable height.
+         pd->winpos.h = usable_bounds.h;
+         pd->winpos.y = usable_bounds.y;
+      }
+
+      else
+      {
+         // Convert a centered location to screen a screen location.
+         if ( pd->winpos.y == SDL_WINDOWPOS_CENTERED ) {
+            pd->winpos.y = (usable_bounds.h / 2) - (pd->winpos.h / 2);
+         }
+
+         // If the bottom-edge of the window is not visible, move up.
+         s32 ymax = (pd->winpos.y + pd->winpos.h);
+         if ( ymax > usable_bounds.h ) {
+            pd->winpos.y = (usable_bounds.y + usable_bounds.h) - pd->winpos.h;
+         }
+
+         // If the top-edge of the window is not visible, move down.
+         if ( pd->winpos.y < usable_bounds.y ) {
+            pd->winpos.y = usable_bounds.y;
+         }
+      }
+
+
+      if ( pd->winpos.w > usable_bounds.w ) {
+         // Clamp to the window usable width.
+         pd->winpos.w = usable_bounds.w;
+         pd->winpos.x = usable_bounds.x;
+      }
+
+      else
+      {
+         // Convert a centered location to screen a screen location.
+         if ( pd->winpos.x == SDL_WINDOWPOS_CENTERED ) {
+            pd->winpos.x = (usable_bounds.w / 2) - (pd->winpos.w / 2);
+         }
+
+         // If the right-edge of the window is not visible, move left.
+         s32 xmax = (pd->winpos.x + pd->winpos.w);
+         if ( xmax > usable_bounds.w ) {
+            pd->winpos.x = (usable_bounds.x + usable_bounds.w) - pd->winpos.w;
+         }
+
+         // If the left-edge of the window is not visible, move right.
+         if ( pd->winpos.x < usable_bounds.x ) {
+            pd->winpos.x = usable_bounds.x;
+         }
+      }
+   }
+
+
    SDL_WindowFlags window_flags = (SDL_WindowFlags)
          ( SDL_WINDOW_OPENGL
          | SDL_WINDOW_RESIZABLE
@@ -261,14 +407,19 @@ disco(progdata_s *pd)
 
    // Create the main window.  When using SDL2, this is the process/thread that
    // will receive events.
-   pd->disco.window = SDL_CreateWindow((const char *)pd->prg_name.buf.vp,
+   pd->disco.window = SDL_CreateWindow((const c8 *)pd->prg_name,
          pd->winpos.x, pd->winpos.y, pd->winpos.w, pd->winpos.h,
          window_flags);
 
-   if ( pd->disco.window == NULL ) {
-      SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, (c8 *)pd->prg_name.buf.vp,
-            "Failed to create the main program window.  Cannot continue, sorry.", NULL);
-      TTYF(pd, "%s:%d SDL_CreateWindow() failed.", XYZ_CFL);
+   if ( pd->disco.window == NULL )
+   {
+      const char *sdlerr = SDL_GetError();
+      s32 errlen = stbsp_snprintf(pd->err.buf, pd->err.bufdim,
+            "Cannot continue: %s:%d SDL_CreateWindow(OPENGL) failed with: [%s]\n",
+            XYZ_CFL, sdlerr);
+      SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, pd->prg_name,
+            pd->err.buf, NULL);
+      pd->tty.out(pd, pd->err.buf, errlen);
       XYZ_BREAK
    }
 
@@ -290,10 +441,15 @@ disco(progdata_s *pd)
    pd->disco.render_thread_running = XYZ_FALSE;
 
    render_h = SDL_CreateThread(render_thread, "RenderThread", pd);
-   if ( render_h == NULL ) {
-      SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, (c8 *)pd->prg_name.buf.vp,
-            "The pixels spilled out of the program. :(  Cannot continue.", NULL);
-      TTYF(pd, "%s:%d SDL_CreateThread(RenderThread) failed.", XYZ_CFL);
+   if ( render_h == NULL )
+   {
+      const char *sdlerr = SDL_GetError();
+      s32 errlen = stbsp_snprintf(pd->err.buf, pd->err.bufdim,
+            "Cannot continue: %s:%d SDL_CreateThread(RenderThread) "
+            "failed with: [%s]\n", XYZ_CFL, sdlerr);
+      SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, pd->prg_name,
+            pd->err.buf, NULL);
+      pd->tty.out(pd, pd->err.buf, errlen);
       XYZ_BREAK
    }
 
@@ -306,8 +462,8 @@ disco(progdata_s *pd)
 
    if ( sanity == 0 ) {
       // The rendering thread never signaled that it started.
-      SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, (c8 *)pd->prg_name.buf.vp,
-            "The box of pixels never said hello.  Sorry, cannot continue.", NULL);
+      SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, pd->prg_name,
+            "Cannot continue: the render thread never responded.", NULL);
       TTYF(pd, "%s:%d The render thread never signaled it was ready.", XYZ_CFL);
       XYZ_BREAK
    }
@@ -323,9 +479,14 @@ disco(progdata_s *pd)
       program_h = SDL_CreateThread(pd->main_thread, "ProgramThread", pd);
       if ( program_h == NULL )
       {
-         SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, (c8 *)pd->prg_name.buf.vp,
-               "Could not start the program. :(  Cannot continue.", NULL);
-         TTYF(pd, "%s:%d SDL_CreateThread(ProgramThread) failed.", XYZ_CFL);
+         const char *sdlerr = SDL_GetError();
+         s32 errlen = stbsp_snprintf(pd->err.buf, pd->err.bufdim,
+               "Cannot continue: %s:%d SDL_CreateThread(ProgramThread) "
+               "failed with: [%s]\n", XYZ_CFL, sdlerr);
+         SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, pd->prg_name,
+               pd->err.buf, NULL);
+         pd->tty.out(pd, pd->err.buf, errlen);
+
          pd->program_running = XYZ_FALSE;
          pd->disco.running = XYZ_FALSE;
          XYZ_BREAK
@@ -435,12 +596,15 @@ render_thread(void *arg)
 
    // Create the OpenGL context and bind it to the main window.
    pd->disco.gl_context = SDL_GL_CreateContext(pd->disco.window);
-   if ( pd->disco.gl_context == NULL ) {
-      SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, (c8 *)pd->prg_name.buf.vp,
-            "Could not talk the to graphics card.  Cannot continue, sorry.", NULL);
+   if ( pd->disco.gl_context == NULL )
+   {
       const char *sdlerr = SDL_GetError();
-      TTYF(pd, "%s:%d SDL_GL_CreateContext() failed with: [%s]\n",
-            XYZ_CFL, sdlerr);
+      s32 errlen = stbsp_snprintf(pd->err.buf, pd->err.bufdim,
+            "Cannot continue: %s:%d SDL_GL_CreateContext() "
+            "failed with: [%s]\n", XYZ_CFL, sdlerr);
+      SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, pd->prg_name,
+            pd->err.buf, NULL);
+      pd->tty.out(pd, pd->err.buf, errlen);
       XYZ_BREAK
    }
 
@@ -469,9 +633,9 @@ render_thread(void *arg)
 
    if ( gl_init_err == true )
    {
-      SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, (c8 *)pd->prg_name.buf.vp,
-            "Could not load important graphics.  Cannot continue, sorry.", NULL);
-      TTYF(pd, "%s:%d Failed to load OpenGL functions.\n", XYZ_CFL);
+      SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, pd->prg_name,
+            "Cannot continue: gl3wInit() failed to load OpenGL functions.", NULL);
+      TTYF(pd, "%s:%d gl3wInit() failed to load OpenGL functions.\n", XYZ_CFL);
       XYZ_BREAK
    }
 
