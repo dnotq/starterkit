@@ -9,49 +9,67 @@
 
 
 /**
- * Finds the last segment of a path.
+ * Finds the last segment of a string given a separator.
  *
- * Examples:
+ * A typical use would be for getting the last part of a path.
+ *
+ * Examples for a separator of '/':
  *  /                  -> /
+ *  ./                 -> ./
  *  /usr/local/bin/    -> bin/
  *  /usr/local/bin     -> bin
  *  /usr/local/hello.c -> hello.c
+ *  /program           -> program
  *  somefile.txt       -> somefile.txt
  *
- * @param[in] filepath Pointer to terminated path/file string.
+ * @param[in] nt_str Pointer to terminated string.
+ * @param[in] sep    Separator character.
  *
- * @return Pointer to the last segment of the path.
+ * @return Pointer to the last segment of the string.
+ */
+const c8 *
+xyz_str_lastseg(const c8 *nt_str, c8 sep)
+{
+   const c8 *c   = nt_str + 1;
+   const c8 *cp  = nt_str;
+   const c8 *seg = nt_str;
+
+   if ( seg != NULL && *c != XYZ_NTERM && *cp != XYZ_NTERM )
+   {
+      for ( ; *c != XYZ_NTERM ; cp = c, c++ )
+      {
+         if ( *cp == sep && *c != sep ) {
+            seg = c;
+         }
+      }
+   }
+
+   return seg;
+}
+// xyz_str_lastseg()
+
+
+/**
+ * Tries to find the last part of a path.
+ *
+ * Surprisingly difficult to do for multi-platform support since Windows
+ * can have '/' in a filename, and Unix uses '\' for escaping characters
+ * in a path.
+ *
+ * This function takes the least-effort approach and tries finding the last
+ * segment of the input using both common path separators, and assumes the
+ * shortest result is the right one.
+ *
+ * @param filepath
+ *
+ * @return The last segment of the path.
  */
 const c8 *
 xyz_path_lastpart(const c8 *filepath)
 {
-   const c8 *f_start = filepath;
-   const c8 *f_prev = filepath;
-   const c8 *f_end = filepath;
-
-   for ( ; *f_end != XYZ_NTERM ; f_end++ )
-   {
-      if ( *f_end == '/' || *f_end == '\\' ) {
-         f_prev = f_start;
-         f_start = f_end;
-      }
-   }
-
-   // Advance past any previous separator.
-   if ( f_prev < f_start && (*f_prev == '/' || *f_prev == '\\') ) {
-      f_prev++;
-   }
-
-   if ( *f_start == '/' || *f_start == '\\' ) {
-      f_start++;
-   }
-
-   // Use the previous segment if the last character is a separator.
-   if ( f_start >= f_end && f_prev < f_start ) {
-      f_start = f_prev;
-   }
-
-   return f_start;
+   const c8 *str1 = xyz_str_lastseg(filepath, XYZ_UNIX_PSEP);
+   const c8 *str2 = xyz_str_lastseg(filepath, XYZ_WIN_PSEP);
+   return (str1 > str2) ? str1 : str2;
 }
 // xyz_path_lastpart()
 

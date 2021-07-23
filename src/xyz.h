@@ -108,6 +108,21 @@ extern "C" {
 /// Current File and Line.
 #define XYZ_CFL xyz_path_lastpart(__FILE__), __LINE__
 
+/// Windows path separator.
+#define XYZ_WIN_PSEP '\\'
+
+/// Unix path separator.
+#define XYZ_UNIX_PSEP '/'
+
+// May have to be determined at runtime.
+#if defined(_MSC_VER)
+/// System path separator.
+#define XYZ_SYS_PSEP XYZ_WIN_PSEP
+#else
+/// System path separator.
+#define XYZ_SYS_PSEP XYZ_UNIX_PSEP
+#endif
+
 
 /// TODO placeholder, replace with allocator wrapper functions.
 #define xyz_malloc(sz) malloc(sz)
@@ -177,8 +192,8 @@ typedef struct xyz_meta_unused_tag
 
 
 
+const c8 * xyz_str_lastseg(const c8 *filepath, c8 sep);
 const c8 * xyz_path_lastpart(const c8 *filepath);
-
 
 /// TODO Implement.
 //s32 xyz_meta_init(xyz_meta *mt, u32 type, u32 alloc);
