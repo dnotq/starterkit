@@ -11,14 +11,13 @@ add_executable(${EXEC_NAME}
     program.c
     cpp_stuff.cpp
     xyz.c
-    ${IMGUI_DIR}/imgui_demo.cpp # remove if not needed.
-    ${IMGUI_DIR}/imgui.cpp
-    ${IMGUI_DIR}/imgui_widgets.cpp
-    ${IMGUI_DIR}/imgui_tables.cpp
-    ${IMGUI_DIR}/imgui_draw.cpp
     ${IMGUI_DIR}/backends/imgui_impl_sdl.cpp     # change to implementation.
     ${IMGUI_DIR}/backends/imgui_impl_opengl3.cpp # change to implementation.
-    ${IMGUI_DIR}/examples/libs/gl3w/GL/gl3w.c
+    ${IMGUI_DIR}/imgui_demo.cpp # remove if not needed.
+    ${IMGUI_DIR}/imgui.cpp
+    ${IMGUI_DIR}/imgui_draw.cpp
+    ${IMGUI_DIR}/imgui_tables.cpp
+    ${IMGUI_DIR}/imgui_widgets.cpp
 )
 
 # This will set imgui to use STB printf replacement.

@@ -21,15 +21,21 @@ The Starter Kit is just that, a starting point, you are expected to change it an
 ![Starterkit Screenshot](starterkit_shot.png "Starterkit Screenshot")
 
 
+## Last Build Versions - Dec 13, 2022
+
+- gcc 12.2.0 x86
+- clang 15.0.5 x86
+- VS2019 19.29.30147 x86
+- SDL2 2.26.1
+- imgui 1.89.1
+- stb_sprintf 1.10
+
+
 ## Requirements
 
-- A C and C++ compiler.  Tested: Visual Studio 2019, Msys2/MinGW64 (clang and gcc).
-- An SDL2 supported OS.
-
-Optional:
-
-- CMake.
-- Git.
+- A C and C++ compiler
+- An SDL2 supported OS
+- CMake (or your own build system)
 
 
 ## Dependencies and Build
@@ -38,11 +44,11 @@ TL;DR: Clone or download the dependency libraries into the `src/deps` directory,
 
 ```
 src/deps/imgui
-src/deps/SDL2_mingw_2_0_14 (SDL2_vc_2_0_14 for Windows, or whatever name you want.)
+src/deps/SDL2_mingw_2.26.1 (or "SDL2_vc_2.26.1" for VS SDL2 lib)
 src/deps/stb
 ```
 
-Edit the CMakeLists.txt file to specify the exact directory for the libraries (SDL2 mostly).
+Edit the top CMakeLists.txt file to specify the exact directory for the libraries (SDL2 mostly).
 
 Run the build script (build_win.bat or build_unix.sh) for your OS.
 
