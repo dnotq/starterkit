@@ -14,7 +14,7 @@ if [ -z "$1" ] ; then
    cmake -E chdir build_unix cmake -G "MinGW Makefiles" ..
    cmake --build build_unix
 else
-   cmake -E chdir build_unix cmake -G "MinGW Makefiles" -DCMAKE_BUILD_TYPE=$1 ..
+   cmake -E chdir build_unix cmake -G "Unix Makefiles" -DCMAKE_BUILD_TYPE=$1 ..
    cmake --build build_unix --config $1
 fi
 

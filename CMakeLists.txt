@@ -91,9 +91,9 @@ elseif (APPLE)
 
 else ()
     # Unix
-    set(SDL2_BASE_DIR "/usr/local")
-    set(SDL2_INC_DIR "${SDL2_BASE_DIR}/include/SDL2")
-    set(SDL2_LIB_DIR "${SDL2_BASE_DIR}/lib")
+    set(SDL2_BASE_DIR "/usr/include")
+    set(SDL2_INC_DIR "${SDL2_BASE_DIR}/SDL2")
+    set(SDL2_LIB_DIR "/lib/x86_64-linux-gnu/")
     set(SDL2_RUNTIME "")
 
 endif ()
