@@ -74,14 +74,14 @@ set(STB_DIR "${CMAKE_SOURCE_DIR}/src/deps/stb")
 
 if (MINGW)
     # MinGW
-    set(SDL2_BASE_DIR "${CMAKE_SOURCE_DIR}/src/deps/SDL2_mingw_2_0_14/x86_64-w64-mingw32")
+    set(SDL2_BASE_DIR "${CMAKE_SOURCE_DIR}/src/deps/SDL2_mingw_2.26.1/x86_64-w64-mingw32")
     set(SDL2_INC_DIR "${SDL2_BASE_DIR}/include/SDL2")
     set(SDL2_LIB_DIR "${SDL2_BASE_DIR}/lib")
     set(SDL2_RUNTIME "${SDL2_BASE_DIR}/bin/SDL2.dll")
 
 elseif (MSVC)
     # Windows
-    set(SDL2_BASE_DIR "${CMAKE_SOURCE_DIR}/src/deps/SDL2_vc_2_0_14")
+    set(SDL2_BASE_DIR "${CMAKE_SOURCE_DIR}/src/deps/SDL2_vc_2.26.1")
     set(SDL2_INC_DIR "${SDL2_BASE_DIR}/include")
     set(SDL2_LIB_DIR "${SDL2_BASE_DIR}/lib/x64")
     set(SDL2_RUNTIME "${SDL2_BASE_DIR}/lib/x64/SDL2.dll")

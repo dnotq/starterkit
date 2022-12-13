@@ -41,46 +41,14 @@
 
 
 #include <stdio.h>   // NULL, stdout, fwrite, fflush
-#include "SDL.h"
-//#include "SDL_opengl.h" // Do not use with OpenGL3 / GL3W
-
 
 // IMGUI has pre-build wrappers for many graphics subsystems.
-#define IMGUI_IMPL_OPENGL_LOADER_GL3W
 #include "imgui.h"
-#include "backends/imgui_impl_opengl3.h"
 #include "backends/imgui_impl_sdl.h"
+#include "backends/imgui_impl_opengl3.h"
 
-
-// OpenGL 3.x complicates things compared to using OpenGL 2.x.
-//
-// About Desktop OpenGL function loaders:
-//  Modern desktop OpenGL doesn't have a standard portable header file to load OpenGL function pointers.
-//  Helper libraries are often used for this purpose! Here we are supporting a few common ones (gl3w, glew, glad).
-//  You may use another loader/header of your choice (glext, glLoadGen, etc.), or chose to manually implement your own.
-#if defined(IMGUI_IMPL_OPENGL_ES2)
-#include <GLES2/gl2.h>
-#elif defined(IMGUI_IMPL_OPENGL_LOADER_GL3W)
-#include <GL/gl3w.h>            // Initialize with gl3wInit()
-#elif defined(IMGUI_IMPL_OPENGL_LOADER_GLEW)
-#include <GL/glew.h>            // Initialize with glewInit()
-#elif defined(IMGUI_IMPL_OPENGL_LOADER_GLAD)
-#include <glad/glad.h>          // Initialize with gladLoadGL()
-#elif defined(IMGUI_IMPL_OPENGL_LOADER_GLAD2)
-#include <glad/gl.h>            // Initialize with gladLoadGL(...) or gladLoaderLoadGL()
-#elif defined(IMGUI_IMPL_OPENGL_LOADER_GLBINDING2)
-#define GLFW_INCLUDE_NONE       // GLFW including OpenGL headers causes ambiguity or multiple definition errors.
-#include <glbinding/Binding.h>  // Initialize with glbinding::Binding::initialize()
-#include <glbinding/gl/gl.h>
-using namespace gl;
-#elif defined(IMGUI_IMPL_OPENGL_LOADER_GLBINDING3)
-#define GLFW_INCLUDE_NONE       // GLFW including OpenGL headers causes ambiguity or multiple definition errors.
-#include <glbinding/glbinding.h>// Initialize with glbinding::initialize()
-#include <glbinding/gl/gl.h>
-using namespace gl;
-#else
-#include IMGUI_IMPL_OPENGL_LOADER_CUSTOM
-#endif
+#include "SDL.h"
+#include "SDL_opengl.h"
 
 #include "xyz.h"
 #include "program.h"
@@ -322,6 +290,11 @@ disco(progdata_s *pd)
    SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 3);
    SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 0);
 #endif
+
+   SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, 1);
+   SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE, 24);
+   SDL_GL_SetAttribute(SDL_GL_STENCIL_SIZE, 8);
+
 
    SDL_Thread *render_h = NULL;
    SDL_Thread *program_h = NULL;
@@ -614,22 +587,8 @@ render_thread(void *arg)
    SDL_GL_SetSwapInterval(UPDATE_WITH_VSYNC);
 
 
-   // Initialize the OpenGL loader.
-#if defined(IMGUI_IMPL_OPENGL_LOADER_GL3W)
-   bool gl_init_err = gl3wInit() != 0;
-#elif defined(IMGUI_IMPL_OPENGL_LOADER_GLEW)
-   bool gl_init_err = glewInit() != GLEW_OK;
-#elif defined(IMGUI_IMPL_OPENGL_LOADER_GLAD)
-   bool gl_init_err = gladLoadGL() == 0;
-#elif defined(IMGUI_IMPL_OPENGL_LOADER_GLBINDING2)
-   bool gl_init_err = false;
-   glbinding::Binding::initialize();
-#elif defined(IMGUI_IMPL_OPENGL_LOADER_GLBINDING3)
-   bool gl_init_err = false;
-   glbinding::initialize([](const char* name) { return (glbinding::ProcAddress)SDL_GL_GetProcAddress(name); });
-#else
-   bool gl_init_err = false; // If you use IMGUI_IMPL_OPENGL_LOADER_CUSTOM, your loader is likely to require some form of initialization.
-#endif
+   // TODO Implement and initialize a local (not imgui) OpenGL loader.
+   bool gl_init_err = false; //gl3wInit() != 0;
 
    if ( gl_init_err == true )
    {

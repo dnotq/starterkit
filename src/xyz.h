@@ -24,61 +24,21 @@ extern "C" {
 // The 'char' type in C is undefined as to whether it is signed or unsigned, and
 // is left up to the implementation.  This is unfortunate, especially when
 // interfacing with libc string functions.
+//
+// Specifically left unprotected (no #ifndef) so any redefinition will cause
+// a pre-compiler error if these are already defined elsewhere.
 
-#ifndef c8
-/// Implementation-defined 8-bit type.
-#define c8 char
-#endif
-
-#ifndef s8
-/// Signed 8-bit type.
-#define s8 int8_t
-#endif
-
-#ifndef s16
-/// Signed 16-bit type.
-#define s16 int16_t
-#endif
-
-#ifndef s32
-/// Signed 32-bit type.
-#define s32 int32_t
-#endif
-
-#ifndef s64
-/// Signed 64-bit type.
-#define s64 int64_t
-#endif
-
-#ifndef u8
-/// Unsigned 8-bit type.
-#define u8 uint8_t
-#endif
-
-#ifndef u16
-/// Unsigned 16-bit type.
-#define u16 uint16_t
-#endif
-
-#ifndef u32
-/// Unsigned 32-bit type.
-#define u32 uint32_t
-#endif
-
-#ifndef u64
-/// Unsigned 64-bit type.
-#define u64 uint64_t
-#endif
-
-#ifndef f32
-/// 32-bit binary floating point type.
-#define f32 float
-#endif
-
-#ifndef f64
-/// 64-bit binary floating point type.
-#define f64 double
-#endif
+#define c8  char        ///< Implementation-defined 8-bit type.
+#define s8  int8_t      ///< Signed 8-bit type.
+#define s16 int16_t     ///< Signed 16-bit type.
+#define s32 int32_t     ///< Signed 32-bit type.
+#define s64 int64_t     ///< Signed 64-bit type.
+#define u8  uint8_t     ///< Unsigned 8-bit type.
+#define u16 uint16_t    ///< Unsigned 16-bit type.
+#define u32 uint32_t    ///< Unsigned 32-bit type.
+#define u64 uint64_t    ///< Unsigned 64-bit type.
+#define f32 float       ///< 32-bit binary floating point type.
+#define f64 double      ///< 64-bit binary floating point type.
 
 
 /// Error Block support.
