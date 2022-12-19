@@ -5,6 +5,8 @@
  */
 
 
+#include <stdint.h>     // uintXX_t, intXX_t, UINTXX_MAX, INTXX_MAX, etc.
+#include <stdbool.h>    // true, false
 #include "xyz.h"
 
 
@@ -81,8 +83,8 @@ xyz_path_lastpart(const c8 *filepath)
 // ==========================================================================
 
 // The actual data buffer itself is not contained, encapsulated, allocated,
-// freed, or otherwise managed by this code.  Only access to reading or
-// writing is managed, and whether the buffer is full or empty.  It is up
+// freed, or otherwise managed by this code.  Only indexes for reading and
+// writing are managed, and whether the buffer is full or empty.  It is up
 // to the calling code to behave.
 //
 // The rd and wr fields are the indexes of where data should be read and
@@ -93,184 +95,114 @@ xyz_path_lastpart(const c8 *filepath)
 // can only ever contain 99 elements when it is full.
 
 
+// Define XYZ_RBAM_EN_STATS to enable the used and free calculations.
+#define XYZ_RBAM_EN_STATS 1
+
+
 /**
  * Initialize an RBAM structure for first use.
  *
- * @param[in] rbam  pointer to the xyz_rbam structure for the RBAM.
- * @param[in] size  the number of elements in the data structure being
- *                  managed by the RBAM, must be >= 2.
+ * @param[in]   rbam    Pointer to the xyz_rbam structure for the RBAM.
+ * @param[in]   dim     The number of elements in the buffer being managed, must be >= 2.
  *
- * @return XYZ_TRUE if initialization succeeded, otherwise XYZ_FALSE if size
- *         is less than 2.
+ * @return true if dim >= 2, otherwise false.
  */
-u32
-xyz_rbam_init(xyz_rbam *rbam, u32 dim)
+bool
+xyz_rbam_init(xyz_rbam *rbam, uint32_t dim)
 {
-   if ( dim < 2 ) { return XYZ_FALSE; }
-   rbam->dim = dim;
-   rbam->rd = 0;
-   rbam->wr = 0;
-   rbam->next = 1;
-   rbam->used = 0;
-   rbam->free = dim - 1;
+    if ( dim < 2 ) { return false; }
+    rbam->rd = 0;
+    rbam->wr = 0;
+    rbam->next = 1;
+    rbam->dim = dim;
+    rbam->used = 0;
+    rbam->free = dim - 1;
 
-   return XYZ_TRUE;
+    return true;
 }
 // xyz_rbam_init()
 
 
 /**
- * Get the buffer index value that comes after the specified index.
- *
- * @param[in] rbam  pointer to the xyz_rbam structure for the RBAM.
- * @param index     specified known index value.
- *
- * @return The index value after the specified index.
- */
-u32
-xyz_rbam_next(xyz_rbam *rbam, u32 index)
-{
-   return (index >= (rbam->dim - 1) ? 0 : index + 1);
-}
-// xyz_rbam_next()
-
-
-/**
- * Get the buffer index value that comes before the specified index.
- *
- * @param[in] rbam  pointer to the xyz_rbam structure for the RBAM.
- * @param index     specified known index value.
- *
- * @return The index value prior-to the specified index.
- */
-u32
-xyz_rbam_prev(xyz_rbam *rbam, u32 index)
-{
-   return (index == 0 ? (rbam->dim - 1) : index - 1);
-}
-// xyz_rbam_prev()
-
-
-//
-// Writer Functions
-//
-
-
-/**
- * Checks if a buffer is full.
- *
- * @param[in] rbam  pointer to the xyz_rbam structure for the RBAM.
- *
- * @return XYZ_TRUE if the buffer is full, otherwise XYZ_FALSE.
- */
-u32
-xyz_rbam_is_full(xyz_rbam *rbam)
-{
-   return (rbam->next == rbam->rd ? XYZ_TRUE : XYZ_FALSE);
-}
-// xyz_rbam_is_full()
-
-
-/**
  * Call to indicate the current element has been written.
  *
- * @param[in] rbam  pointer to the xyz_rbam structure for the RBAM.
- *
- * If the buffer is not full, then the current write location (wr) points to
- * the current element to be written.  Data should be written to the wr index,
- * then call this function to make the data available for reading.  This is a
- * post-write activity.
+ * If the buffer is not full, then the write index (wr) points to the current
+ * data element to be written.  Data should be written to the wr index, then
+ * this function called to make the data available for reading.  The wr index
+ * will be updated to the next available index for writing.
  *
  * Example use:
  *
- * if ( xyz_rbam_is_full(rbam) == XYZ_FALSE ) {
+ * if ( RBAM_FREE(rbam) ) {
  *   // Write data.
  *   data[rbam->wr].field = 1;
  *
  *   // Indicate the data has been written.
- *   xyz_rbam_write(rbam);
+ *   rbam_write(rbam);
  * }
  *
- * @return XYZ_TRUE if the write was valid, XYZ_FALSE if the buffer is full.
+ * @param[in]   rbam    Pointer to the xyz_rbam structure for the RBAM.
  */
-u32
+void
 xyz_rbam_write(xyz_rbam *rbam)
 {
-   if ( xyz_rbam_is_full(rbam) == XYZ_TRUE ) { return XYZ_FALSE; }
+    if ( XYZ_RBAM_FREE(rbam) )
+    {
+        // The buffer is not full, so the location pointed to by 'next' is
+        // available for writing.
+        rbam->wr = rbam->next;
+        rbam->next = (rbam->next >= (rbam->dim - 1) ? 0 : rbam->next + 1);
+    }
 
-   // The buffer is not full, so the location pointed to by 'next' is
-   // available for writing.
-   rbam->wr = rbam->next;
-   rbam->next = xyz_rbam_next(rbam, rbam->next);
+    // Calculate the buffer use.
+    #ifdef XYZ_RBAM_EN_STATS
+    u32 rd = rbam->rd;
+    rbam->used = (rbam->wr >= rd ? rbam->wr - rd : (rbam->dim - rd) + rbam->wr);
+    rbam->free = rbam->dim - rbam->used - 1;
+    #endif
 
-   // Calculate the buffer use.
-   u32 rd = rbam->rd;
-   rbam->used = (rbam->wr >= rd ? rbam->wr - rd : (rbam->dim - rd) + rbam->wr);
-   rbam->free = rbam->dim - rbam->used - 1;
-
-   return XYZ_TRUE;
+    return;
 }
 // xyz_rbam_write()
-
-
-//
-// Reader Functions
-//
-
-
-/**
- * Checks if a buffer is empty.
- *
- * @param[in] rbam  pointer to the xyz_rbam structure for the RBAM.
- *
- * @return XYZ_TRUE if the buffer is empty, otherwise XYZ_FALSE.
- */
-u32
-xyz_rbam_is_empty(xyz_rbam *rbam)
-{
-   return (rbam->rd == rbam->wr ? XYZ_TRUE : XYZ_FALSE);
-}
-// xyz_rbam_is_empty()
 
 
 /**
  * Call to indicate that the current element has been read (past-tense).
  *
- * If the buffer is not empty, then the current read location (rd) points to
+ * If the buffer is not empty, then the current read index (rd) points to
  * the current element to read.  Use (i.e. read) the data, then call this
  * function to indicate that the data has been consumed.  In other words,
  * calling this function is a post-reading activity.  If the buffer is not
- * empty then rd will be updated to the next available entry for reading.
+ * empty then rd will be updated to the next available index for reading.
  *
  * Example use:
  *
- * while ( xyz_rbam_is_empty(rbam) == XYZ_FALSE ) {
+ * while ( RBAM_MORE(rbam) ) {
  *   // Display data.
  *   printf("%d\n", data[rbam->rd].field);
  *
  *   // Done reading, consume the current element.
- *   xyz_rbam_read(rbam);
+ *   rbam_read(rbam);
  * }
  *
- * @param[in] rbam  pointer to the xyz_rbam structure for the RBAM.
- *
- * @return XYZ_TRUE if there is more data in the buffer, XYZ_FALSE if the
- *         buffer is empty.
+ * @param[in]   rbam    Pointer to the xyz_rbam structure for the RBAM.
  */
-u32
+void
 xyz_rbam_read(xyz_rbam *rbam)
 {
-   if ( xyz_rbam_is_empty(rbam) == XYZ_TRUE ) { return XYZ_FALSE; }
+    if ( XYZ_RBAM_MORE(rbam) ) {
+        // The buffer is not empty, update the read index.
+        rbam->rd = (rbam->rd >= (rbam->dim - 1) ? 0 : rbam->rd + 1);
+    }
 
-   // The buffer is not empty, update the read index.
-   rbam->rd = xyz_rbam_next(rbam, rbam->rd);
+    // Calculate the buffer use.
+    #ifdef XYZ_RBAM_EN_STATS
+    u32 wr = rbam->wr;
+    rbam->used = (wr >= rbam->rd ? wr - rbam->rd : (rbam->dim - rbam->rd) + wr);
+    rbam->free = rbam->dim - rbam->used - 1;
+    #endif
 
-   // Calculate the buffer use.
-   u32 wr = rbam->wr;
-   rbam->used = (wr >= rbam->rd ? wr - rbam->rd : (rbam->dim - rbam->rd) + wr);
-   rbam->free = rbam->dim - rbam->used - 1;
-
-   return XYZ_TRUE;
+    return;
 }
 // xyz_rbam_read()
 
@@ -278,20 +210,20 @@ xyz_rbam_read(xyz_rbam *rbam)
 /**
  * Drains the buffer (makes the buffer empty).
  *
- * @param[in] rbam  pointer to the xyz_rbam structure for the RBAM.
+ * @param[in]   rbam    Pointer to the xyz_rbam structure for the RBAM.
  *
  * @return The number of elements drained.
  */
 u32
 xyz_rbam_drain(xyz_rbam *rbam)
 {
-   u32 wr = rbam->wr;
-   u32 drained = (wr >= rbam->rd ? wr - rbam->rd : (rbam->dim - rbam->rd) + wr);
-   rbam->rd = rbam->wr;
-   rbam->used = 0;
-   rbam->free = rbam->dim - 1;
+    uint32_t wr = rbam->wr;
+    uint32_t drained = (wr >= rbam->rd ? wr - rbam->rd : (rbam->dim - rbam->rd) + wr);
+    rbam->rd = rbam->wr; // empty condition.
+    rbam->used = 0;
+    rbam->free = rbam->dim - 1;
 
-   return drained;
+    return drained;
 }
 // xyz_rbam_drain()
 

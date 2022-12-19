@@ -11,6 +11,7 @@
 
 #include <stdlib.h>     // malloc, calloc, realloc, free
 #include <stdint.h>		// uintXX_t, intXX_t, UINTXX_MAX, INTXX_MAX, etc.
+#include <stdbool.h>    // true, false
 
 // Avoid C++ name-mangling for C functions.
 #ifdef __cplusplus
@@ -52,15 +53,6 @@ extern "C" {
 /// 0 is an error code.
 #define XYZ_OK       0
 #define XYZ_ERR     -1
-
-/// Flags for making code more readable.
-#define XYZ_TRUE     1
-#define XYZ_YES      1
-#define XYZ_ON       1
-
-#define XYZ_FALSE    0
-#define XYZ_NO       0
-#define XYZ_OFF      0
 
 /// string terminator (to avoid confusion because NUL != NULL (look it up)).
 #define XYZ_NTERM '\0'
@@ -155,7 +147,7 @@ typedef struct xyz_meta_unused_tag
 const c8 * xyz_str_lastseg(const c8 *filepath, c8 sep);
 const c8 * xyz_path_lastpart(const c8 *filepath);
 
-/// TODO Implement.
+// TODO Implement.
 //s32 xyz_meta_init(xyz_meta *mt, u32 type, u32 alloc);
 
 
@@ -164,6 +156,8 @@ const c8 * xyz_path_lastpart(const c8 *filepath);
 //
 // Single reader-writer lock-free ring buffer access manager (RBAM)
 //
+// Useful for managing zero-copy shared data between two tasks or threads.
+//
 // Note: The 'used' and 'free' fields are for informational status only and may
 // be inaccurate if the reader and writer use different threads.
 //
@@ -171,24 +165,42 @@ const c8 * xyz_path_lastpart(const c8 *filepath);
 
 
 /// Ring Buffer Access Manager (RBAM) structure.
-typedef struct unused_tag_xyz_rbam {
-   u32   dim;     ///< Dimension (total number) of elements in the buffer.
-   u32   rd;      ///< Index for reading.
-   u32   wr;      ///< Index for writing.
+typedef struct t_xyz_rbam {
+   u32   rd;      ///< Index for reading buffer data.
+   u32   wr;      ///< Index for writing buffer data.
    u32   next;    ///< Next write index.
+   u32   dim;     ///< Dimension (total number) of elements in the buffer.
    u32   used;    ///< Number of used elements in the buffer.
    u32   free;    ///< Number of free elements in the buffer.
 } xyz_rbam;
 
-
-u32 xyz_rbam_init(xyz_rbam *rbam, u32 dim);
-u32 xyz_rbam_next(xyz_rbam *rbam, u32 index);
-u32 xyz_rbam_prev(xyz_rbam *rbam, u32 index);
-u32 xyz_rbam_is_full(xyz_rbam *rbam);
-u32 xyz_rbam_write(xyz_rbam *rbam);
-u32 xyz_rbam_is_empty(xyz_rbam *rbam);
-u32 xyz_rbam_read(xyz_rbam *rbam);
+bool xyz_rbam_init(xyz_rbam *rbam, u32 dim);
+void xyz_rbam_write(xyz_rbam *rbam);
+void xyz_rbam_read(xyz_rbam *rbam);
 u32 xyz_rbam_drain(xyz_rbam *rbam);
+
+/// Evaluates to true if the buffer is full.
+/// @param[in] rbam pointer to the xyz_rbam structure for the RBAM.
+#define XYZ_RBAM_FULL(rbam) (rbam->next == rbam->rd)
+
+/// Evaluates to true if the buffer has at least one free element for writing.
+/// @param[in] rbam Pointer to the xyz_rbam structure for the RBAM.
+#define XYZ_RBAM_FREE(rbam) (rbam->next != rbam->rd)
+
+/// Evaluates to true if the buffer is empty.
+/// @param[in] rbam Pointer to the xyz_rbam structure for the RBAM.
+#define XYZ_RBAM_EMPTY(rbam) (rbam->rd == rbam->wr)
+
+/// Evaluates to true if the buffer has at least one element to read.
+/// @param[in] rbam Pointer to the xyz_rbam structure for the RBAM.
+#define XYZ_RBAM_MORE(rbam) (rbam->rd != rbam->wr)
+
+/// Evaluates to the next index in the buffer, given a current index.
+/// Can be used to help iterate over a buffer without reading or writing.
+/// @param[in] rbam Pointer to the xyz_rbam structure for the RBAM.
+/// @param[in] idx  Current iteration index.
+/// @return The next index in the buffer.
+#define XYZ_RBAM_NEXT(rbam,idx) ((idx >= (rbam->dim - 1) ? 0 : idx + 1))
 
 
 

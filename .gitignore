@@ -7,6 +7,7 @@ src/deps/*
 
 # Build directory.
 build/
+build_mingw/
 build_unix/
 build_win/
 

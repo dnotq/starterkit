@@ -16,7 +16,7 @@
  *
  * The design implemented here manages the event loop on the main process
  * thread, and creates a dedicated thread for rendering.  This allows screen
- * updates to take place while blocking mouse operations are taking place, i.e.
+ * updates to take place while mouse-blocking operations are taking place, i.e.
  * window dragging, resizing, etc.
  *
  * The rendering thread will call a host program provided function when screen
@@ -40,9 +40,11 @@
  */
 
 
-#include <stdio.h>   // NULL, stdout, fwrite, fflush
+#include <stdio.h>         // NULL, stdout, fwrite, fflush
+#include <stdint.h>        // uintXX_t, intXX_t, UINTXX_MAX, INTXX_MAX, etc.
+#include <stdbool.h>       // true, false
 
-// IMGUI has pre-build wrappers for many graphics subsystems.
+// IMGUI has pre-built wrappers for many graphics subsystems.
 #include "imgui.h"
 #include "backends/imgui_impl_sdl.h"
 #include "backends/imgui_impl_opengl3.h"
@@ -172,13 +174,13 @@ main(int argc, char *argv[])
    }
 
    // Be optimistic about subsystem initialization.
-   pd->sdl.have_audio = XYZ_TRUE;
-   pd->sdl.have_timer = XYZ_TRUE;
+   pd->sdl.have_audio = true;
+   pd->sdl.have_timer = true;
 
    // Audio and timer are not critical, for now.
    if ( SDL_InitSubSystem(SDL_INIT_AUDIO) != 0 )
    {
-      pd->sdl.have_audio = XYZ_FALSE;
+      pd->sdl.have_audio = false;
 
       const char *sdlerr = SDL_GetError();
       s32 errlen = stbsp_snprintf(pd->err.buf, pd->err.bufdim,
@@ -191,7 +193,7 @@ main(int argc, char *argv[])
 
    if ( SDL_InitSubSystem(SDL_INIT_TIMER) != 0 )
    {
-      pd->sdl.have_timer = XYZ_FALSE;
+      pd->sdl.have_timer = false;
 
       const char *sdlerr = SDL_GetError();
       s32 errlen = stbsp_snprintf(pd->err.buf, pd->err.bufdim,
@@ -327,7 +329,7 @@ disco(progdata_s *pd)
 
       else
       {
-         // Convert a centered location to screen a screen location.
+         // Convert a centered location to a screen location.
          if ( pd->winpos.y == SDL_WINDOWPOS_CENTERED ) {
             pd->winpos.y = (usable_bounds.h / 2) - (pd->winpos.h / 2);
          }
@@ -353,7 +355,7 @@ disco(progdata_s *pd)
 
       else
       {
-         // Convert a centered location to screen a screen location.
+         // Convert a centered location to a screen location.
          if ( pd->winpos.x == SDL_WINDOWPOS_CENTERED ) {
             pd->winpos.x = (usable_bounds.w / 2) - (pd->winpos.w / 2);
          }
@@ -410,8 +412,8 @@ disco(progdata_s *pd)
 
 
    // Set the running flag and start the rendering thread.
-   pd->disco.running = XYZ_TRUE;
-   pd->disco.render_thread_running = XYZ_FALSE;
+   pd->disco.running = true;
+   pd->disco.render_thread_running = false;
 
    render_h = SDL_CreateThread(render_thread, "RenderThread", pd);
    if ( render_h == NULL )
@@ -428,7 +430,7 @@ disco(progdata_s *pd)
 
    // Wait for rendering thread to finish initialization.
    u32 sanity = 300;
-   while ( pd->disco.render_thread_running == XYZ_FALSE && sanity > 0 ) {
+   while ( pd->disco.render_thread_running == false && sanity > 0 ) {
       SDL_Delay(10);
       sanity--;
    }
@@ -445,7 +447,7 @@ disco(progdata_s *pd)
    // Set the program running flag and start the program thread if specified.
    // When this flag is set false by the program, the event loop will stop
    // the render thread and shutdown.
-   pd->program_running = XYZ_TRUE;
+   pd->program_running = true;
 
    if ( pd->main_thread != NULL )
    {
@@ -460,8 +462,8 @@ disco(progdata_s *pd)
                pd->err.buf, NULL);
          pd->tty.out(pd, pd->err.buf, errlen);
 
-         pd->program_running = XYZ_FALSE;
-         pd->disco.running = XYZ_FALSE;
+         pd->program_running = false;
+         pd->disco.running = false;
          XYZ_BREAK
       }
    }
@@ -480,34 +482,34 @@ disco(progdata_s *pd)
 
    SDL_Event *event = &(pd->disco.event); // convenience.
 
-   while ( pd->disco.running == XYZ_TRUE && SDL_WaitEvent(event) != 0 )
+   while ( pd->disco.running == true && SDL_WaitEvent(event) != 0 )
    {
       pd->disco.event_counter++;
       ImGui_ImplSDL2_ProcessEvent(event);
 
       // Give the program event call-back a chance to handle events first.
-      s32 handled = XYZ_FALSE;
+      s32 handled = false;
       if ( pd->callback.event != NULL ) {
          handled = pd->callback.event(pd);
       }
 
-      if ( handled == XYZ_FALSE )
+      if ( handled == false )
       {
          // Check for quit or main window close events.
          if ( event->type == SDL_QUIT ) {
-            pd->disco.running = XYZ_FALSE;
+            pd->disco.running = false;
          }
 
          if ( event->type == SDL_WINDOWEVENT &&
               event->window.event == SDL_WINDOWEVENT_CLOSE &&
               event->window.windowID == SDL_GetWindowID(pd->disco.window) ) {
-            pd->disco.running = XYZ_FALSE;
+            pd->disco.running = false;
          }
       }
 
       // Check for program exit.
-      if ( pd->program_running == XYZ_FALSE ) {
-         pd->disco.running = XYZ_FALSE;
+      if ( pd->program_running == false ) {
+         pd->disco.running = false;
       }
    }
 
@@ -634,13 +636,13 @@ render_thread(void *arg)
 
 
    // Update status flag that the rendering thread is active.
-   pd->disco.render_thread_running = XYZ_TRUE;
+   pd->disco.render_thread_running = true;
    pd->disco.render_time_us = 0;
 
    //u64 perftime_freq = SDL_GetPerformanceFrequency();
 
    // Render until signaled to quit.
-   while ( pd->disco.running == XYZ_TRUE )
+   while ( pd->disco.running == true )
    {
       // Do not render if minimized.
       // TODO Might still need to issue some call-backs?
@@ -849,9 +851,7 @@ out_cons(void *arg, const c8 *text, u32 len)
       xyz_rbam *rbam = &(pd->cons.rbam);
 
       // If the line list is full, make room for the new line.
-      if ( xyz_rbam_is_full(rbam) == XYZ_TRUE ) {
-         xyz_rbam_read(rbam);
-      }
+      if ( XYZ_RBAM_FULL(rbam) ) { xyz_rbam_read(rbam); }
 
       // Calculate the position of the end of the line in the buffer, which is
       // also the "new position" for the line after this one.
@@ -860,7 +860,7 @@ out_cons(void *arg, const c8 *text, u32 len)
       // Clear any top lines that would be overwritten by the new line.
       while ( list[*rd].pos >= list[*wr].pos &&
               list[*rd].pos < newpos &&
-              xyz_rbam_is_empty(rbam) == XYZ_FALSE )
+              XYZ_RBAM_MORE(rbam) )
       { xyz_rbam_read(rbam); }
 
       // Adjust the new starting location if out of bounds.
@@ -872,8 +872,7 @@ out_cons(void *arg, const c8 *text, u32 len)
          newpos = linelen;
 
          // Clear any lines that will be overwritten by the new line.
-         while ( list[*rd].pos < newpos &&
-                 xyz_rbam_is_empty(rbam) == XYZ_FALSE )
+         while ( list[*rd].pos < newpos && XYZ_RBAM_MORE(rbam) )
          { xyz_rbam_read(rbam); }
       }
 
@@ -893,9 +892,7 @@ out_cons(void *arg, const c8 *text, u32 len)
 
       // If the line list is now full, read at least one line so the new
       // position can be stored.
-      if ( xyz_rbam_is_full(rbam) == XYZ_TRUE ) {
-         xyz_rbam_read(rbam);
-      }
+      if ( XYZ_RBAM_FULL(rbam) ) { xyz_rbam_read(rbam); }
 
       // Prepare for the next line.
       list[*wr].pos = newpos;

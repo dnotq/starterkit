@@ -9,6 +9,9 @@
 #ifndef SRC_PROGRAM_H_
 #define SRC_PROGRAM_H_
 
+#include <stdint.h>        // uintXX_t, intXX_t, UINTXX_MAX, INTXX_MAX, etc.
+#include <stdbool.h>       // true, false
+
 #include "xyz.h"           // Simplified unambiguous types and other helpers.
 #include "SDL.h"           // SDL_Window
 
@@ -66,7 +69,7 @@ typedef s32 (callback_fn)(void *arg);
 typedef u32(out_fn)(void *arg, const c8 *text, u32 len);
 
 /// Console log line.
-typedef struct unused_tag_consline_s
+typedef struct t_consline_s
 {
    u32 pos; ///< Position in the buffer where the line starts.
    u32 len; ///< Length of the line.
@@ -74,7 +77,7 @@ typedef struct unused_tag_consline_s
 
 
 /// Program Data Structure.
-typedef struct unused_tag_progdata_s
+typedef struct t_progdata_s
 {
    const c8   *prg_name;      ///< Program name for the window title.
    xyz_meta    prg_metaname;  ///< Experimental metadata type.
@@ -97,9 +100,9 @@ typedef struct unused_tag_progdata_s
 
    c8 *imgui_ini_filename;    ///< Set to NULL to disable, otherwise a filename.
 
-   // ^^ Prorgram data above. ^^
-   // --------------------------
-   // vv Support data below.  vv
+   // ^^  Program data above.  ^^
+   // ---------------------------
+   // vv  Support data below.  vv
 
    struct {
    SDL_Window *window;                 ///< Pointer to the main application window.
@@ -114,8 +117,8 @@ typedef struct unused_tag_progdata_s
    } disco;                            ///< DISCO (Display and IO).
 
    struct {
-   u32      have_audio;       ///< ZYZ_TRUE if the audio subsystem is available.
-   u32      have_timer;       ///< ZYZ_TRUE if the timer subsystem is available.
+   bool     have_audio;       ///< true if the audio subsystem is available.
+   bool     have_timer;       ///< true if the timer subsystem is available.
    } sdl;
 
    struct {

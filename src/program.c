@@ -6,10 +6,13 @@
  * @date   April 5, 2020
  */
 
-#include <stdio.h>	// NULL, stdout, fwrite
+#include <stdio.h>	      // NULL, stdout, fwrite
+#include <stdint.h>        // uintXX_t, intXX_t, UINTXX_MAX, INTXX_MAX, etc.
+#include <stdbool.h>       // true, false
+
 #include "SDL.h"
 #include "program.h"
-#include "stb_sprintf.h"    // stbsp_snprintf
+#include "stb_sprintf.h"   // stbsp_snprintf
 #include "cpp_stuff.h"
 
 
@@ -169,7 +172,7 @@ main_program(void *arg)
 
 
    // Must watch the disco.running flag.
-   while ( pd->program_running == XYZ_TRUE && pd->disco.running == XYZ_TRUE )
+   while ( pd->program_running == true && pd->disco.running == true )
    {
       // TODO lots of program kinds of stuff here.
       SDL_Delay(100);
@@ -182,7 +185,7 @@ main_program(void *arg)
    // joined properly.  Also push an event to make sure disco responds in a
    // timely manner.
 
-   pd->program_running = XYZ_FALSE;
+   pd->program_running = false;
 
    SDL_Event sdlevent;
    sdlevent.type = SDL_QUIT;
@@ -198,12 +201,12 @@ main_program(void *arg)
  *
  * @param[in] arg Pointer to the program data structure.
  *
- * @return XYZ_TRUE if events were handled, otherwise XYZ_FALSE;
+ * @return true if events were handled, otherwise false;
  */
 static s32
 events(void *arg)
 {
-   s32 handled = XYZ_FALSE;
+   s32 handled = false;
 
    progdata_s *pd = (progdata_s *)arg;
 
@@ -213,7 +216,7 @@ events(void *arg)
    // TODO Event stuff.
    (void)pd; // not currently used.
 
-   // Return XYZ_FALSE to allow disco to handle window exit events.
+   // Return false to allow disco to handle window exit events.
 
    return handled;
 }

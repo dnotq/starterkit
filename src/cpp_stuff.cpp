@@ -7,12 +7,14 @@
  */
 
 
+#include <stdint.h>        // uintXX_t, intXX_t, UINTXX_MAX, INTXX_MAX, etc.
+#include <stdbool.h>       // true, false
 #include "cpp_stuff.h"
 
 #include "SDL.h"
 #include "imgui.h"
 #include "program.h"
-#include "stb_sprintf.h"    // stbsp_snprintf
+#include "stb_sprintf.h"   // stbsp_snprintf
 #include "math.h"
 
 
@@ -77,7 +79,7 @@ imgui_draw(progdata_s *pd)
       ImGui::SameLine();
       ImGui::Checkbox("Ball", &show_ball);
 
-      ImGui::SliderInt("##Lines", (s32 *)&max_pts, 2, 300, "Lines %d");
+      ImGui::SliderInt("##Lines", (s32 *)&max_pts, 2, 120, "Lines %d");
       ImGui::SameLine();
       ImGui::SliderFloat("##Speed", &speed, 0.01f, 1.0f, "Speed %.2f");
 
@@ -143,7 +145,7 @@ imgui_draw(progdata_s *pd)
    float thickness = 2.0f;
 
    static xyz_rbam rbam;
-   #define PT_ARRAY 302
+   #define PT_ARRAY 121
    static pos_s points[PT_ARRAY];
    static linept_s pt1;
    static linept_s pt2;
@@ -164,7 +166,7 @@ imgui_draw(progdata_s *pd)
       rate = 0.0f;
 
       // Clear a point if necessary.
-      while ( xyz_rbam_is_full(&rbam) == XYZ_TRUE || rbam.used > max_pts ) {
+      while ( XYZ_RBAM_FULL((&rbam)) || rbam.used >= max_pts ) {
          xyz_rbam_read(&rbam);
       }
 
@@ -189,14 +191,18 @@ imgui_draw(progdata_s *pd)
 
    rate += speed;
 
-   // Draw the points.
-   u32 col = 255;
-
-   for ( u32 i = rbam.rd ; i != rbam.wr ; )
+   if ( rbam.used > 0 )
    {
-      bg->AddLine(points[i].pt1, points[i].pt2, IM_COL32(0, 0, col, 255), thickness);
-      i = xyz_rbam_next(&rbam, i);
-      col = (col < 10) ? 255 : (col - 10);
+      // Draw the points.
+      u32 step = 255 / rbam.used;
+      u32 col = step;
+
+      for ( u32 i = rbam.rd ; i != rbam.wr ; )
+      {
+         bg->AddLine(points[i].pt1, points[i].pt2, IM_COL32(0, 0, col, 255), thickness);
+         i = XYZ_RBAM_NEXT((&rbam), i);
+         col += step;
+      }
    }
 
 }
