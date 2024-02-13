@@ -4,14 +4,16 @@
 
 set(EXEC_NAME "starterkit")
 
-
 # Files to build the executable.
 add_executable(${EXEC_NAME}
     disco.cpp
     program.c
-    cpp_stuff.cpp
-    xyz.c
-    ${IMGUI_DIR}/backends/imgui_impl_sdl.cpp     # change to implementation.
+    draw_ui.cpp
+    draw_3d.c
+    xyz/xyz.c
+    log/log.c
+    ${GL3W_DIR}/src/gl3w.c
+    ${IMGUI_DIR}/backends/imgui_impl_sdl2.cpp    # change to implementation.
     ${IMGUI_DIR}/backends/imgui_impl_opengl3.cpp # change to implementation.
     ${IMGUI_DIR}/imgui_demo.cpp # remove if not needed.
     ${IMGUI_DIR}/imgui.cpp
@@ -20,16 +22,25 @@ add_executable(${EXEC_NAME}
     ${IMGUI_DIR}/imgui_widgets.cpp
 )
 
-# This will set imgui to use STB printf replacement.
+# This will set imgui to use STB printf replacement, and prevent the
+# logging system from also including the implementation (it can only
+# be included once for a binary).
 target_compile_definitions(${EXEC_NAME} PRIVATE
     IMGUI_USE_STB_SPRINTF
 )
 
 target_include_directories(${EXEC_NAME} PRIVATE
+    .
+    cbuf
+    cidx
+    log
+    xyz
     ${SDL2_INC_DIR}
+    ${GL3W_DIR}/include
+    ${CGLM_DIR}/include
     ${STB_DIR}
     ${IMGUI_DIR}
-    ${IMGUI_DIR}/examples/libs/gl3w
+    ${EXTRA_INCLUDES}
 )
 
 #target_link_directories(${EXEC_NAME} PRIVATE

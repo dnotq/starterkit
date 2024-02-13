@@ -1,42 +1,32 @@
-# Starter Kit for Cross-Platform Program Development.
+# Starter Kit for Cross-Platform Program Development
 
-The Starter Kit is a small set of C/C++ files to quickly get started writing a cross-platform graphic-capable program.  An executable program created with this kit will be small and only have a few dynamic-link library (DLL for Windows) or Shared-Object (SO for Unix-like) dependencies that are not already part of the host operating system.
+The purpose of the Starter Kit is to provide a minimal amount of code necessary to create a program, with graphic and UI capability, on *nix (BSD or Linux), MacOS, and Windows systems.
 
-The default configuration uses SDL2 and OpenGL3.x for the graphics abstraction layer, and IMGUI for widgets and controls.  C is the primary language, however since IMGUI is written using some C++ features, a C++ compiler is also required.
+Goals:
+- Simple
+- Minimal dependencies, included as source code where possible or practical
+- Quick and easy to create a graphics-oriented program
+- Small executable with minimal additional runtime libraries
 
-The Starter Kit is deliberately small and does only a minimum amount of setup necessary to get a graphic-capable program running that can use a "modern" GPU (meaning, closed proprietary hardware and drivers) that requires an OS like Windows, Unix, or MAC.  A standard event-loop, rendering thread, and a main program thread are provided which makes starting a new project very similar to a basic "Hello, World" C program.  A minimal graphic console is also included, so getting text output is ready to go.  The rest is up to you.
+The Starter Kit is NOT a framework, a library, or engine of any kind.
 
-Writing programs for a personal-computer (PC) has become overly complicated, much more so than it needs to be.  While there are many "frameworks" available, using one (or more) is just "yet another layer" to be learned, become frustrated with, and locked into.  The Starter Kit attempts to provide the minimal amount of layering and dependencies necessary to start writing platform independent programs.
+The default configuration uses SDL2 and OpenGL3.x for the graphics abstraction layer, and ImGUI for widgets and controls.  C is the primary language, however since ImGUI is written using some C++ features, a C++ compiler is also required.
 
-For the impatient, where to look for stuff:
+The Starter Kit is deliberately small and does only a minimum amount of setup necessary to get a graphic-capable program up and running.  A standard event-loop and rendering thread are provided which makes starting a new project very similar to a simple "Hello, World" C program.  A minimal console is also included, but the rest is up to you.
 
-- To start adding program specific code, see the `main_program()` function in `program.c`.
-- For drawing see the `draw()` call-back function in `program.c` and the `cpp_stuff.cpp` file.
-- To make IMGUI windows with widgets an controls see the `cpp_stuff.cpp` file.
-- For event handling, use the `events()` call-back function in `program.c`.
-- The actual `main()` function is in `disco.cpp`.
+## Motivation
+
+Writing programs for a personal-computer (PC) has become overly complicated, much more so than it needs to be.  While there are many frameworks, engines, and "environments" (i.e. Electron, etc.) available, using one (or more) is yet-another-layer to be learned, become frustrated with, and locked into.  The Starter Kit attempts to provide the minimal amount of abstraction and dependencies necessary to start writing platform independent graphical programs.
 
 The Starter Kit is just that, a starting point, you are expected to change it and make it your own.
 
 ![Starterkit Screenshot](starterkit_shot.png "Starterkit Screenshot")
 
-
-## Last Build Versions - Dec 13, 2022
-
-- gcc 12.2.0 x86
-- clang 15.0.5 x86
-- VS2019 19.29.30147 x86
-- SDL2 2.26.1
-- imgui 1.89.1
-- stb_sprintf 1.10
-
-
 ## Requirements
 
 - A C and C++ compiler
-- An SDL2 supported OS
+- An SDL2 supported OS with OpenGL
 - CMake (or your own build system)
-
 
 ## Dependencies and Build
 
@@ -47,55 +37,67 @@ src/deps/imgui
 src/deps/SDL2_mingw_2.26.1 (or "SDL2_vc_2.26.1" for VS SDL2 lib)
 src/deps/stb
 ```
+Optional dependencies (for direct OpenGL drawing):
+```
+src/deps/gl3w
+src/deps/cglm
+```
 
 Edit the top CMakeLists.txt file to specify the exact directory for the libraries (SDL2 mostly).
 
-Run the build script (build_win.bat or build_unix.sh) for your OS.
-
+Run the make script (make_win.bat, make_mingw.sh, make_unix.sh) for your OS.
 
 ### Dependencies and Build, Longer Version
 
 The following libraries are used to provide abstraction and cross platform support.  The libraries are all open-source or public domain, and written in C or C++.
 
-All libraries support Unix/Win/MAC.
+All libraries support *nix/MAC/Win.
 
-- SDL2, download the prebuilt development version and extract to src/deps/SDL2, or install SDL2 with your system package manager.(1)
-- IMGUI, clone into src/deps/imgui.
-- STB, clone into src/deps/stb.
+### CMAKE
 
-Note(1): If SDL2 is installed with a package manager, be sure to include the SDL2 "development library" as well.
+Currently CMake is used because it helps with the cross-platform tools detection and Makefile setup.  The setup is very minimal and as little "magic" used as possible.
 
+It should be reasonably simple to move to something else entirely, write your own build scripts or Makefiles, etc..  There is nothing special required to compile any of the source code used by the Starter Kit, other than normal compiler parameters, library and header locations, etc..
 
-### SDL2 2.x
+### SDL2 2.x (soon SDL3)
 
-Provides cross platform windowing, graphics, sound, events, user I/O, threads, and file I/O.
+Provides cross platform windowing, graphics, sound, events, threads, atomics, and file I/O.  It is the additional abstractions beyond just graphics, sound, and events that sets SDL2 apart from many other libraries.  SDL2 strikes a good balance between "just enough" and "going too far", which helps make cross-platform development much easier.
 
-- Website:  [https://libsdl.org/](https://libsdl.org/)
-- Clone:    [http://hg.libsdl.org/SDL](http://hg.libsdl.org/SDL)
-- Download: [https://libsdl.org/download-2.0.php](https://libsdl.org/download-2.0.php)
-- Docs:     [https://wiki.libsdl.org/FrontPage](https://wiki.libsdl.org/FrontPage)
+Website: [https://libsdl.org/](https://libsdl.org/)
 
-Use prebuilt DLLs for Windows, install dev libs via package manager on Unix systems.
+Use prebuilt DLLs for Windows or MacOS, or for *nix systems install with a package manager (be sure to also install the developer support package.)
 
+### ImGUI
 
-### IMGUI
+Cross platform Immediate-Mode widgets and controls.  Allows for very responsive programs that are easy to write.  Limited drawing can also be done using ImGUI's internal functions, which provides a quick and simple way to access accelerated drawing without any additional OpenGL setup.
 
-Cross platform Immediate-Mode widgets and controls.  Allows for very responsive programs that are easy to write.
-
-- Website:  [https://github.com/ocornut/imgui](https://github.com/ocornut/imgui)
-- Clone:    [https://github.com/ocornut/imgui.git](https://github.com/ocornut/imgui.git)
-- Docs:     [https://github.com/ocornut/imgui/tree/master/docs](https://github.com/ocornut/imgui/tree/master/docs)
+- Website: [https://github.com/ocornut/imgui](https://github.com/ocornut/imgui)
 
 Included as source and built as part of the program.  The project has example code and support for almost every OS and graphics abstraction layer, so feel free to use whatever you want.
 
-
 ### STB
 
-Single-file public domain (or MIT licensed) libraries for C/C++.  Currently `stb_sprintf` is the main requirement from this collection.
+Single-file public domain (or MIT licensed) libraries for C/C++.  Currently `stb_sprintf` is the main requirement from this collection and provides a faster and cleaner replacement for `printf` formatting capability.  Cross-platform tokens are provided for consistent 64-bit values, as well as better floating point conversion, and other tokens for things like direct binary formatting, etc..
 
-- Website:  [https://github.com/nothings/stb](https://github.com/nothings/stb)
-- Clone:    [https://github.com/nothings/stb.git](https://github.com/nothings/stb.git)
-- Docs:     See each source file.
+STB also provides some very popular image and font loading functions, among others.
+
+- Website: [https://github.com/nothings/stb](https://github.com/nothings/stb)
+
+Included as source and built as part of the program.
+
+### GL3W
+
+OpenGL header generator for full access to OS OpenGL libraries.  Optional, not needed if only ImGUI or SDL2 are used for drawing.
+
+- Website: [https://github.com/skaslev/gl3w](https://github.com/skaslev/gl3w)
+
+Run the python script `gl3w_gen.py` to generate the OpenGL headers and C file.  The generated headers and C file are included as source and built as part of the program.
+
+### CGLM
+
+An optimized pure C version of the GLM (OpenGL Mathematics library).  Optional, not needed if the provided math types and functions are not needed.
+
+- Website: [https://github.com/recp/cglm](https://github.com/recp/cglm)
 
 Included as source and built as part of the program.
 
@@ -107,8 +109,9 @@ Once the dependencies are set up, edit the CMakeLists.txt file to specify the ex
 
 Building the Starter Kit can be done with one of the provided scripts:
 
-- `build_win.bat` for Windows.
-- `build_unix.sh` for Unix or MAC (MAC compiling / testing is a big TODO).
+- `make_unix.sh` for *nix or MAC (MAC compiling / testing is a TODO).
+- `make_mingw.sh` for MinGW.
+- `make_win.bat` for Windows.
 
 The scripts are very basic and simply use the system agnostic CMake commands that do the following (build_unix or build_win, depending on which is run):
 
@@ -128,57 +131,96 @@ Visual Studio creates the `Debug` and `Release` directories inside the specified
 
 Windows also needs the `SDL2.dll` in the same directory as the executable, and the CMake script attempts to copy the correct (32-bit or 64-bit) `SDL2.dll` to the executable path.  If CMakes fails to copy the file, you will need to do so manually (see the SDL2 dependency `libs` directory).
 
-Program distribution should only require the executable itself and `SDL2.dll` for Windows; it is assumed that a Unix system will have the `SDL2.so` shared object installed with the system, i.e. via the package manager.
+Program distribution should only require the executable itself and `SDL2.dll` for Windows; it is assumed that a *nix system will have the `SDL2.so` shared object installed with the system, i.e. via the package manager, but a specific SDL2.so can also be distributed with the binary.
 
 The default build will statically link core libs, so when compiling with MinGW, for example, the MinGW DLLs are *not* required to be distributed with the executable.
 
+## Running
+
+Native OS, just run the binary:
+
+- *nix build: `build_unix/bin/starterkit`
+- MinGW build: `build_mgw/bin/starterkit`
+- Windows build: `build_win/bin/Debug/starterkit`
+
+
+### VirtualBox Guest
+
+Linux guest VM under VirtualBox with VMSVGA only supports OpenGL up to 2.1.  The VboxSVGA setting supports OpenGL 3.x, but apparently has security issues (need reference) and does not work for Linux any more?  There are a few options:
+
+- Compile with SK_GL21_GLSL120 defined (see disco.cpp) which limits GL to 2.1.
+- If using MESA, use the Gallium LLVMpipe software renderer to run:
+
+`LIBGL_ALWAYS_SOFTWARE=true GALLIUM_DRIVER=llvmpipe build_unix/bin/starterkit`
+
+The software renderer does not seem to support VSYNC, so there is a simple frame-rate limiter in the render thread that may need to be modified.
 
 ----
 
 
 ## Code Organization
 
-The code is roughly split into to main parts, the OS abstraction (event I/O and rendering) and the program.  The abstraction part is called `disco`, which is an attempt to be a catchy name for "Display and I/O".
+The code is roughly split into to main parts, the OS abstraction (event-loop and rendering) and the program.  The abstraction part is called `disco`, which is an attempt to be a catchy name for "Display and I/O".
 
-The SDL2 event-handler (the message pump) is required to run on the main process, i.e. the process started by the OS when the program is run.  To create a program that is event-friendly and CPU-use friendly, a typical message pump likes to block in a system call waiting on events.
+The SDL2 event-handler (the message pump) is required to run on the process started by the OS when the program is run.  To create a program that is event-friendly and CPU-use friendly, a typical message pump likes to block in a system call waiting on events.
 
-Programs like games and emulators have much to do other than process user input, while typical "desktop" programs tend to be more event-driven.  So, to allow the program to do cool things other that sit an wait on user input, two additional threads are created:
+A blocking message pump is good for CPU use and system load, but this can be tricky for games and emulators which usually poll the message pump and are driven more by frame update time (and consume more CPU time).
 
-1. A rendering thread.  This allows the program to have a responsive interface and update the window while it is being dragged, resized, etc.
-2. A program thread.  This is essentially "the program" where all the other cool stuff happens.
+The Starter Kit design tries to strike a balance between game-like performance and being nice on CPU load, by incorporating a few ideas:
 
-The program can also set up event and rendering call-back functions, which is where program-specific event handling and drawing should take place.  So, from the "program perspective" there is a main-thread, an event function, and a drawing function.  Widget and control events are mostly taken care of by IMGUI, so getting a graphic interface up and running is very quick and easy.
+1. A rendering thread is created to allow the program to have a responsive interface and update the window while it is being dragged, resized, etc..
+2. The event-loop uses a blocking call to wait-for and respond to events.
+3. The main program can create its own thread (or threads) to run in the background if necessary.
+
+The rendering thread has several callback hooks that can be called every frame.  This allows a program to run code for every frame to generate the UI and graphics, run program logic etc..
+
+The event-handler has a callback hook that can be called for every event.  If the program does not handle the event, a default handler is used.
+
+Between the once-per-frame rendering and event callbacks, a program make never require any more sophistication.
 
 The program organization looks something like this:
 
 ```
-OS
-  WinMain / SDLmain
+OS process
   main()
-    program_init() (one time pre-run initialization)
-    disco() ---creates---+--> render_thread() --calls--> draw() callback
-                         +--> program_thread()
-      event loop
-        event() callback
+    initialize
+    call disco_run()
+  end
 
-    clean-up() callback
+  disco_run()
+    initialize
+    create render_thread()
+    while running
+      wait for event
+      events() callback
+    loop
+  end
+
+  render_thread()
+    initialize
+    while running
+      draw_ui() callback
+      render ImGUI
+      draw_post_ui() callback
+      wait vsync
+    loop
+  end
 ```
 
-The rendering thread is set to synchronize with the display's vertical sync, so the `draw()` call-back will be called once per frame.  The `event()` call-back will be called any time there is a message not handled by IMGUI.  The `program_thread()` is running all the time.
+The rendering thread is set to synchronize with the display's vertical sync, so the `draw_ui()` and `draw_post_ui()` callbacks will be called once per frame.  The `event()` callback will be called any time there is a event not handled by ImGUI.
 
-The graphic-context for the window is created in the render thread, so all drawing needs to happen in that thread or in functions called by that thread, like in the `draw()` call-back.
-
+The graphic-context for the window is created in the render thread, so all drawing needs to happen in functions called by the render thread, i.e. the `draw_ui()` and `draw_post_ui()` callbacks.
 
 ----
 
-## IMGUI Fonts
+## ImGUI Fonts
 
-IMGUI provides some true-type fonts to use instead of the single built-in "proggy-clean" font.
+ImGUI provides some true-type fonts to use instead of the single built-in "proggy-clean" font.
 
 - "Cousine" font has slashed zeros, so it wins.
 - "Roboto" font is also nice looking, as well as "Karla".
 
-The true-type fonts need to be converted to a header file and included in the source code.  IMGUI comes with a simple utility to do the conversion.
+The true-type fonts need to be converted to a header file and included in the source code.  ImGUI comes with a simple utility to do the conversion.
 
 Building and converting a font using a VS2019 command prompt (unix shell would just use the system compiler):
 
@@ -196,7 +238,7 @@ $ ./binary_to_compressed_c.exe -base85 Cousine-Regular.ttf cousine_font > cousin
 // Copy the font header to the primary source directory and include like this:
 #include "cousine_font.h"
 
-// Add to IMGUI with:
+// Add to ImGUI with:
 ImGui::GetIO().Fonts->AddFontFromMemoryCompressedBase85TTF(cousine_font_compressed_data_base85, 18);
 ```
 
@@ -204,6 +246,6 @@ ImGui::GetIO().Fonts->AddFontFromMemoryCompressedBase85TTF(cousine_font_compress
 
 ## License
 
-In the spirit of the STB library, this code is in the public domain. You can do anything you want with it.  You have no legal obligation to do anything else, although I really appreciate attribution.
+In the spirit of the STB library, this code is in the public domain. You can do anything you want with it.  You have no legal obligation to do anything else, although attribution is greatly appreciated.
 
 The code is also licensed under the MIT open source license, if you are unhappy about using public domain.  Every source file includes an explicit dual-license for you to choose from.

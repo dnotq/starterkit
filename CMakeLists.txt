@@ -2,11 +2,11 @@
 # Starter Kit.
 #
 
-project(STARTERKIT)
-
 # cmake is unhappy without a required version specification.
-cmake_minimum_required(VERSION 3.5)
+cmake_minimum_required(VERSION 3.12)
 set(CMAKE_COLOR_MAKEFILE ON)
+
+project(STARTERKIT)
 
 # Designate a binary directory.
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR}/bin)
@@ -24,10 +24,13 @@ if (MSVC)
     # Od       Disabled optimization
     # Oi       Create intrinsic functions
     # Zi       Generates complete debugging information
+    # -experimental:c11atomics  Needed for C and C++ atomics using a single header
+    # -std:c11 Needed for C and C++ atomics using a single header
+
     if (CMAKE_BUILD_TYPE STREQUAL "Release")
-        set(CMAKE_CXX_FLAGS "-nologo -fp:fast -W4 -MT  -Gy -O2 -Oi")
+        set(CMAKE_CXX_FLAGS "-nologo -fp:fast -W4 -MT  -Gy -O2 -Oi -experimental:c11atomics -std:c11")
     else ()
-        set(CMAKE_CXX_FLAGS "-nologo -fp:fast -W4 -MTd -Gy -Od -Zi")
+        set(CMAKE_CXX_FLAGS "-nologo -fp:fast -W4 -MTd -Gy -Od -Zi -experimental:c11atomics -std:c11")
     endif ()
 
     # -subsystem:windows,5.01 should allow running on WinXP and above.
@@ -36,6 +39,8 @@ if (MSVC)
     # Minimums: 5.01 (x86), 5.02 (x64), 6.02 (ARM)
     #set(CMAKE_EXE_LINKER_FLAGS "-subsystem:windows,5.02")
     set(CMAKE_EXE_LINKER_FLAGS "-subsystem:windows")
+
+    set(EXTRA_INCLUDES "")
 
 elseif (MINGW)
     if (CMAKE_BUILD_TYPE STREQUAL "Release")
@@ -50,17 +55,39 @@ elseif (MINGW)
         set(CMAKE_CXX_FLAGS "-Wall -Wextra -march=native -mtune=native -ffast-math -static -Og -g")
     endif ()
 
+    set(EXTRA_INCLUDES "")
+
 else ()
-    # TODO other switches for MacOS.
-    set(CMAKE_CXX_FLAGS "-Wall -Wextra -O2")
-    # TODO linker flags as necessary.
-    #set(CMAKE_EXE_LINKER_FLAGS "")
+    if (CMAKE_BUILD_TYPE STREQUAL "Release")
+        # TODO other switches for MacOS.
+        set(CMAKE_CXX_FLAGS "-Wall -Wextra -O2")
+
+        # TODO linker flags as necessary.
+        #set(CMAKE_EXE_LINKER_FLAGS "")
+
+    else ()
+        # TODO other switches for MacOS.
+        set(CMAKE_CXX_FLAGS "-Wall -Wextra -Og -g")
+
+        # TODO linker flags as necessary.
+        #set(CMAKE_EXE_LINKER_FLAGS "")
+    endif ()
+
+    if (EXISTS "/usr/local/include")
+        set(EXTRA_INCLUDES "/usr/local/include")
+    else ()
+        set(EXTRA_INCLUDES "")
+    endif ()
 endif ()
+
 
 ##
 # Dependency locations.
 set(IMGUI_DIR "${CMAKE_SOURCE_DIR}/src/deps/imgui")
 set(STB_DIR "${CMAKE_SOURCE_DIR}/src/deps/stb")
+set(GL3W_DIR "${CMAKE_SOURCE_DIR}/src/deps/gl3w")
+set(CGLM_DIR "${CMAKE_SOURCE_DIR}/src/deps/cglm")
+
 
 ##
 # SDL2
@@ -74,14 +101,14 @@ set(STB_DIR "${CMAKE_SOURCE_DIR}/src/deps/stb")
 
 if (MINGW)
     # MinGW
-    set(SDL2_BASE_DIR "${CMAKE_SOURCE_DIR}/src/deps/SDL2_mingw_2.26.1/x86_64-w64-mingw32")
+    set(SDL2_BASE_DIR "${CMAKE_SOURCE_DIR}/src/deps/SDL2_mingw_2.26.3/x86_64-w64-mingw32")
     set(SDL2_INC_DIR "${SDL2_BASE_DIR}/include/SDL2")
     set(SDL2_LIB_DIR "${SDL2_BASE_DIR}/lib")
     set(SDL2_RUNTIME "${SDL2_BASE_DIR}/bin/SDL2.dll")
 
 elseif (MSVC)
     # Windows
-    set(SDL2_BASE_DIR "${CMAKE_SOURCE_DIR}/src/deps/SDL2_vc_2.26.1")
+    set(SDL2_BASE_DIR "${CMAKE_SOURCE_DIR}/src/deps/SDL2_vc_2.26.3")
     set(SDL2_INC_DIR "${SDL2_BASE_DIR}/include")
     set(SDL2_LIB_DIR "${SDL2_BASE_DIR}/lib/x64")
     set(SDL2_RUNTIME "${SDL2_BASE_DIR}/lib/x64/SDL2.dll")
@@ -89,20 +116,26 @@ elseif (MSVC)
 elseif (APPLE)
     # TODO MACOS
 
-elseif(LINUX)
-    # Linux
-    set(SDL2_BASE_DIR "/usr/include")
-    set(SDL2_INC_DIR "${SDL2_BASE_DIR}/SDL2")
-    set(SDL2_LIB_DIR "/lib/x86_64-linux-gnu/")
-    set(SDL2_RUNTIME "")
-
 else ()
-    # Unix
-    set(SDL2_BASE_DIR "/usr/local")
+    set(SDL2_BASE_DIR "${CMAKE_SOURCE_DIR}/src/deps/SDL2_linux_2.30.0")
     set(SDL2_INC_DIR "${SDL2_BASE_DIR}/include/SDL2")
     set(SDL2_LIB_DIR "${SDL2_BASE_DIR}/lib")
-    set(SDL2_RUNTIME "")
+    set(SDL2_RUNTIME "${SDL2_BASE_DIR}/lib/libSDL2.so")
 
+#    if (EXISTS "/usr/include/SDL2/SDL.h")
+#        # Linux
+#        set(SDL2_BASE_DIR "/usr/include")
+#            set(SDL2_INC_DIR "${SDL2_BASE_DIR}/SDL2")
+#            set(SDL2_LIB_DIR "/lib/x86_64-linux-gnu/")
+#            set(SDL2_RUNTIME "")
+#
+#    else ()
+#        # Unix
+#        set(SDL2_BASE_DIR "/usr/local")
+#        set(SDL2_INC_DIR "${SDL2_BASE_DIR}/include/SDL2")
+#        set(SDL2_LIB_DIR "${SDL2_BASE_DIR}/lib")
+#        set(SDL2_RUNTIME "")
+#    endif ()
 endif ()
 
 # Find the full paths to the SDL2 libs, which is the recommended practice.
@@ -140,7 +173,6 @@ if (MINGW)
 	# 'ImmGetContext' 'ImmSetCompositionWindow' 'ImmReleaseContext'
 	set(IMGUI_LINK_LIBS "Imm32")
 endif ()
-
 
 
 # Include the source files.

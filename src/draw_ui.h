@@ -1,11 +1,10 @@
 /**
- * @file cpp_stuff.h
+ * @file draw_ui.h
  * @date Jun 5, 2021
  * @author Matthew Hagerty
  */
 
-#ifndef SRC_CPP_STUFF_H_
-#define SRC_CPP_STUFF_H_
+#pragma once
 
 #include "program.h"
 
@@ -14,14 +13,11 @@
 extern "C" {
 #endif
 
-
-void imgui_draw(progdata_s *pd);
+void draw_imgui_ui(pds_s *pds);
 
 #ifdef __cplusplus
 }
 #endif
-
-#endif /* SRC_CPP_STUFF_H_ */
 
 /*
 ------------------------------------------------------------------------------

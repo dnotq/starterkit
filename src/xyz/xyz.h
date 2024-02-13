@@ -1,48 +1,83 @@
 /**
- * Program header.
+ * Generic defines, helpers, and utilities.
  *
- * @file   program.h
+ * @file   xyz.h
  * @author Matthew Hagerty
  * @date   April 5, 2020
+ *
+ * Font check: 0O1lLi
  */
 
-#pragma once
+#ifndef XYZ_H_
+#define XYZ_H_
 
-#include <stdint.h>         // uintXX_t, intXX_t, UINTXX_MAX, INTXX_MAX, etc.
-#include <stdbool.h>        // true, false
+#include <stdlib.h>     // malloc, calloc, realloc, free
+#include <stdint.h>		// uintXX_t, intXX_t, UINTXX_MAX, INTXX_MAX, etc.
+#include <stdbool.h>    // true, false
 
-#include "SDL.h"            // SDL_Window, SDL_atomics, SDL_event
-#include "xyz.h"            // short types.
-#include "disco.h"          // disco data struct.
-//#include "console.h"        // Graphic console.
-
-
-// Included in the header for early error message use.
-#define APP_NAME  "Starter Kit"     ///< Application name.
-#define VER_MAJOR 2                 ///< Major version number.
-#define VER_MINOR 0                 ///< Minor version number.
-
-#define WINDOW_WIDTH  640           ///< Default window width.
-#define WINDOW_HEIGHT 800           ///< Default window height.
-
-
-// Avoid C++ name-mangling since the main source is C.
+// Avoid C++ name-mangling for C functions.
 #ifdef __cplusplus
 extern "C" {
 #endif
 
 
-/// Program Data Structure.  Program-wide data.
-typedef struct t_program_data_s
-{
-    disco_s disco;      ///< Disco interface.
-} pds_s;
+// Nice to have short-name types.  These types break the XYZ_ prefix rule in
+// exchange for a shorter type name (which is half the reason for using them).
+//
+// The 'char' type in C is undefined as to whether it is signed or unsigned, and
+// is left up to the implementation.  This is unfortunate, especially when
+// interfacing with libc functions.
 
+typedef char        c8;     ///< Implementation-defined 8-bit type.
+typedef int8_t      s8;     ///< Signed 8-bit type.
+typedef int16_t     s16;    ///< Signed 16-bit type.
+typedef int32_t     s32;    ///< Signed 32-bit type.
+typedef int64_t     s64;    ///< Signed 64-bit type.
+typedef uint8_t     u8;     ///< Unsigned 8-bit type.
+typedef uint16_t    u16;    ///< Unsigned 16-bit type.
+typedef uint32_t    u32;    ///< Unsigned 32-bit type.
+typedef uint64_t    u64;    ///< Unsigned 64-bit type.
+typedef float       f32;    ///< 32-bit binary floating point type.
+typedef double      f64;    ///< 64-bit binary floating point type.
+
+
+/// Get the sizeof a structure member without having a structure variable.
+#define sizeof_sm(s, m) sizeof((((s *)0)->m))
+
+/// Error Block.
+#define XYZ_EB_START do {
+#define XYZ_EB_BREAK break;
+#define XYZ_EB_RETRY continue;
+#define XYZ_EB_END break; } while(1);
+
+/// string terminator (to avoid confusion because NUL != NULL (look it up)).
+#define XYZ_NTERM '\0'
+
+/// Current File and Line.
+#define XYZ_CFL xyz_basename(__FILE__,NULL), __LINE__
+
+
+/// TODO placeholder, replace with allocator wrapper functions.
+#define xyz_malloc(sz) malloc(sz)
+#define xyz_calloc(num,sz) calloc(num,sz)
+#define xyz_realloc(ptr,sz) realloc(ptr,sz)
+#define xyz_free(ptr) free(ptr)
+
+
+/// Copy a zero-terminated string, always terminating the destination.
+size_t xyz_strlcpy(c8 *dst, const c8 *src, size_t dstsize);
+
+/// Finds the base file name of a file path.
+const c8 * xyz_basename(const c8 *ztp, size_t *len);
+
+/// Wrapper to provide a consistent strerror_r() function.
+void xyz_strerror(s32 errnum, c8 *buf, size_t len);
 
 
 #ifdef __cplusplus
 }
 #endif
+#endif /* XYZ_H_ */
 
 /*
 ------------------------------------------------------------------------------
