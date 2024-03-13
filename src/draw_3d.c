@@ -4,6 +4,14 @@
  * @file   draw_3d.c
  * @author Matthew Hagerty
  * @date   March 12, 2024
+ *
+ * @ref https://paroj.github.io/gltut/
+ * @ref https://www.khronos.org/opengl/wiki/Main_Page
+ * @ref https://docs.gl/gl4/glBindVertexArray
+ * @ref https://cglm.readthedocs.io/en/latest/affine.html
+ * @ref https://learnopengl.com/
+ * @ref https://www.opengl-tutorial.org/
+ * @ref https://en.wikipedia.org/wiki/Active_and_passive_transformation
  */
 
 #include <stdbool.h>    // true,false
@@ -148,6 +156,8 @@ const char* fragment_src =
 static void
 gen_shaders(void) {
 
+    // TODO check for errors, make more robust, include file loading.
+
     // Make a vertex and fragment shader.
     h_vertex_shader = glCreateShader(GL_VERTEX_SHADER);
     glShaderSource(h_vertex_shader, 1, &vertex_src, /*length*/ NULL);
@@ -186,13 +196,18 @@ draw_3d_init(pds_s *pds) {
     logfmt("OpenGL %s, GLSL %s\n"
         , glGetString(GL_VERSION), glGetString(GL_SHADING_LANGUAGE_VERSION));
 
+    // TODO error checking.
     gen_shaders();
 
-    // VAO tracks calls to:
-    //   glVertexAttribPointer
+    // VAO captures state and associations when these functions are called:
+    //   glVertexAttribPointer(1)
     //   glEnableVertexAttribArray
     //   glDisableVertexAttribArray
     //   glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ...) (can only be one of these in a VAO).
+    //
+    // (1) VAOs store which buffer objects are associated with which attributes
+    //     at the time glVertexAttribPointer() is called, but they do NOT store
+    //     the GL_ARRAY_BUFFER binding itself.
 
     // Generate a Vertex Array oject to store all the VBOs and attributes.
     glGenVertexArrays(1, &h_cube_vao);
@@ -298,6 +313,9 @@ draw_3d(pds_s *pds) {
     mat4 view;
     glm_lookat((vec3){pds->camera.x,pds->camera.y,pds->camera.z}, (vec3){0,0,0}, (vec3){0,1,0}, view);
 
+    // Use quaternions to simplify rotations and set up rotations
+    // around a global axis that does not change with the object
+    // being rotated (active rotation).
     versor rx; glm_quatv(rx, pds->model.xrot, (vec3){1,0,0});
     versor ry; glm_quatv(ry, pds->model.yrot, (vec3){0,1,0});
     versor rz; glm_quatv(rz, pds->model.zrot, (vec3){0,0,1});
@@ -348,7 +366,7 @@ draw_3d(pds_s *pds) {
 This software is available under 2 licenses -- choose whichever you prefer.
 ------------------------------------------------------------------------------
 ALTERNATIVE A - MIT License
-Copyright (c) 2020 Matthew Hagerty
+Copyright (c) 2024 Matthew Hagerty
 Permission is hereby granted, free of charge, to any person obtaining a copy of
 this software and associated documentation files (the "Software"), to deal in
 the Software without restriction, including without limitation the rights to
