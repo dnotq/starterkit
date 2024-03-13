@@ -83,6 +83,8 @@ endif ()
 
 ##
 # Dependency locations.
+#
+
 set(IMGUI_DIR "${CMAKE_SOURCE_DIR}/src/deps/imgui")
 set(STB_DIR "${CMAKE_SOURCE_DIR}/src/deps/stb")
 set(GL3W_DIR "${CMAKE_SOURCE_DIR}/src/deps/gl3w")
@@ -117,7 +119,7 @@ elseif (APPLE)
     # TODO MACOS
 
 else ()
-    set(SDL2_BASE_DIR "${CMAKE_SOURCE_DIR}/src/deps/SDL2_linux_2.30.0")
+    set(SDL2_BASE_DIR "${CMAKE_SOURCE_DIR}/src/deps/SDL2_linux_2.30.1")
     set(SDL2_INC_DIR "${SDL2_BASE_DIR}/include/SDL2")
     set(SDL2_LIB_DIR "${SDL2_BASE_DIR}/lib")
     set(SDL2_RUNTIME "${SDL2_BASE_DIR}/lib/libSDL2.so")

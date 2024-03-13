@@ -12,7 +12,10 @@ The Starter Kit is NOT a framework, a library, or engine of any kind.
 
 The default configuration uses SDL2 and OpenGL3.x for the graphics abstraction layer, and ImGUI for widgets and controls.  C is the primary language, however since ImGUI is written using some C++ features, a C++ compiler is also required.
 
-The Starter Kit is deliberately small and does only a minimum amount of setup necessary to get a graphic-capable program up and running.  A standard event-loop and rendering thread are provided which makes starting a new project very similar to a simple "Hello, World" C program.  A minimal console is also included, but the rest is up to you.
+The Starter Kit is deliberately small and does only a minimum amount of setup necessary to get a graphic-capable program up and running.  A standard event-loop and rendering thread are provided which makes starting a new project very similar to a simple "Hello, World" C program.  A minimal graphical console for text output (currently broken) is also included, but the rest is up to you.
+
+The base code has some minimal example code for drawing using ImGUI primitives (lines, boxes, etc.), as well as setting up a pair of shaders for direct OpenGL drawing.
+
 
 ## Motivation
 
@@ -22,36 +25,63 @@ The Starter Kit is just that, a starting point, you are expected to change it an
 
 ![Starterkit Screenshot](starterkit_shot.png "Starterkit Screenshot")
 
+
 ## Requirements
 
 - A C and C++ compiler
+- Python (for gl3w only)
 - An SDL2 supported OS with OpenGL
 - CMake (or your own build system)
 
-## Dependencies and Build
 
-TL;DR: Clone or download the dependency libraries into the `src/deps` directory, which should end up something like this:
+## Dependency Setup and Build
+
+Dependencies need to be setup once.  SDL2 build from source, or download developer prebuilt library for your system.  If OpenGL direct drawing is not needed then the `gl3w` and `cglm` dependencies can be skipped, however the example code requires both.
+
+Example for a *nix system.
 
 ```
-src/deps/imgui
-src/deps/SDL2_mingw_2.26.1 (or "SDL2_vc_2.26.1" for VS SDL2 lib)
-src/deps/stb
-```
-Optional dependencies (for direct OpenGL drawing):
-```
-src/deps/gl3w
-src/deps/cglm
+$ git clone git@github.com:dnotq/starterkit.git
+$ cd starterkit/src/deps
+
+$ export SDL2_INSTALL_DIR=`pwd`/SDL2_linux_2.30.1
+$ mkdir $SDL2_INSTALL_DIR
+$ git clone https://github.com/libsdl-org/SDL.git --branch release-2.30.1 --single-branch SDL2-src
+$ cd SDL2-src
+$ ./configure --prefix=$SDL2_INSTALL_DIR
+$ make -j 12
+$ make install
+
+$ git clone https://github.com/ocornut/imgui.git
+$ git clone https://github.com/nothings/stb.git
+
+Dependencies for direct OpenGL drawing:
+
+$ git clone https://github.com/recp/cglm.git
+$ git clone https://github.com/skaslev/gl3w.git
+$ cd gl3w
+$ python gl3w_gen.py
+$ cd ..
+
+Build and run:
+$ cd ../..
+$ chmod 755 make_unix.sh
+$ ./make_unix.sh
+$ cd build_unix
+$ bin/starterkit
 ```
 
-Edit the top CMakeLists.txt file to specify the exact directory for the libraries (SDL2 mostly).
+Edit the top CMakeLists.txt file to specify the exact directory for the libraries (SDL2 mostly) if necessary.
 
-Run the make script (make_win.bat, make_mingw.sh, make_unix.sh) for your OS.
+Run the make script (make_win.bat, make_mingw.sh, make_unix.sh) for your OS.  You may have to set execute permissions on the scripts.
 
-### Dependencies and Build, Longer Version
+
+### Dependency Details
 
 The following libraries are used to provide abstraction and cross platform support.  The libraries are all open-source or public domain, and written in C or C++.
 
 All libraries support *nix/MAC/Win.
+
 
 ### CMAKE
 
@@ -59,13 +89,17 @@ Currently CMake is used because it helps with the cross-platform tools detection
 
 It should be reasonably simple to move to something else entirely, write your own build scripts or Makefiles, etc..  There is nothing special required to compile any of the source code used by the Starter Kit, other than normal compiler parameters, library and header locations, etc..
 
+
 ### SDL2 2.x (soon SDL3)
 
-Provides cross platform windowing, graphics, sound, events, threads, atomics, and file I/O.  It is the additional abstractions beyond just graphics, sound, and events that sets SDL2 apart from many other libraries.  SDL2 strikes a good balance between "just enough" and "going too far", which helps make cross-platform development much easier.
+Provides a nice cross platform windowing, graphics, sound, events, threads, atomics, and file I/O.  The thread, atomics, and file I/O abstractions are central to writing cross platform code without additional libraries or having to use language-specific types.  SDL2 strikes a good balance between "just enough" and "going too far", which helps make cross-platform development much easier.
 
 Website: [https://libsdl.org/](https://libsdl.org/)
 
-Use prebuilt DLLs for Windows or MacOS, or for *nix systems install with a package manager (be sure to also install the developer support package.)
+Use prebuilt DLLs for Windows or MacOS.  For *nix systems install with a package manager (be sure to also install the developer support package) or from source.
+
+Building SDL2 from source is straight forward and allows the project to use a specific version of the library, separate from the system installed version, if necessary (or desired).  See the Dependency Setup and Build section above for building SDL2 from source on *nix.
+
 
 ### ImGUI
 
@@ -74,6 +108,7 @@ Cross platform Immediate-Mode widgets and controls.  Allows for very responsive 
 - Website: [https://github.com/ocornut/imgui](https://github.com/ocornut/imgui)
 
 Included as source and built as part of the program.  The project has example code and support for almost every OS and graphics abstraction layer, so feel free to use whatever you want.
+
 
 ### STB
 
@@ -85,6 +120,7 @@ STB also provides some very popular image and font loading functions, among othe
 
 Included as source and built as part of the program.
 
+
 ### GL3W
 
 OpenGL header generator for full access to OS OpenGL libraries.  Optional, not needed if only ImGUI or SDL2 are used for drawing.
@@ -92,6 +128,7 @@ OpenGL header generator for full access to OS OpenGL libraries.  Optional, not n
 - Website: [https://github.com/skaslev/gl3w](https://github.com/skaslev/gl3w)
 
 Run the python script `gl3w_gen.py` to generate the OpenGL headers and C file.  The generated headers and C file are included as source and built as part of the program.
+
 
 ### CGLM
 
@@ -107,7 +144,7 @@ Included as source and built as part of the program.
 
 Once the dependencies are set up, edit the CMakeLists.txt file to specify the exact directory for the libraries (SDL2 mostly).  The SDL2 developer library path must be specified so it can be found by the compiler.  Most of the "FindSDL2" CMake modules out there are just overly complicated, IMO, and failed to work correctly.  It is much easier to just tell the compiler where the lib is located.
 
-Building the Starter Kit can be done with one of the provided scripts:
+Building the Starter Kit can be done with one of the provided scripts (you may need to set execute permissions on the scripts):
 
 - `make_unix.sh` for *nix or MAC (MAC compiling / testing is a TODO).
 - `make_mingw.sh` for MinGW.
@@ -129,11 +166,12 @@ The final executable can be found in:
 
 Visual Studio creates the `Debug` and `Release` directories inside the specified build directory.
 
-Windows also needs the `SDL2.dll` in the same directory as the executable, and the CMake script attempts to copy the correct (32-bit or 64-bit) `SDL2.dll` to the executable path.  If CMakes fails to copy the file, you will need to do so manually (see the SDL2 dependency `libs` directory).
+Generally the `SDL2.dll` or `libSDL2.so` library needs to be in the same directory as the executable, and CMake attempts to copy the correct (32-bit or 64-bit) `SDL2.dll` for Windows, `libSDL2.so` for *nix, to the executable path.  If CMakes fails to copy the file, you will need to do so manually (see the SDL2 dependency `libs` directory).
 
-Program distribution should only require the executable itself and `SDL2.dll` for Windows; it is assumed that a *nix system will have the `SDL2.so` shared object installed with the system, i.e. via the package manager, but a specific SDL2.so can also be distributed with the binary.
+Program distribution should only require the executable itself and `SDL2.dll` for Windows and `libSDL2.so` for *nix.  If it is expected that the target system will have SDL installed globally, then only the executable should be required.
 
 The default build will statically link core libs, so when compiling with MinGW, for example, the MinGW DLLs are *not* required to be distributed with the executable.
+
 
 ## Running
 
