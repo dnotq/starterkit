@@ -18,6 +18,7 @@ build_win/
 
 # VS project files.
 vs
+.vscode
 
 # IMGUI settings.
 *.ini
