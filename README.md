@@ -51,6 +51,8 @@ $ cd SDL2-src
 $ ./configure --prefix=$SDL2_INSTALL_DIR
 $ make -j 12
 $ make install
+$ cd ..
+$ rm -rf SDL-src
 
 $ git clone https://github.com/ocornut/imgui.git
 $ git clone https://github.com/nothings/stb.git
