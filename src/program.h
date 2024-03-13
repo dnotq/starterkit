@@ -36,6 +36,19 @@ extern "C" {
 typedef struct t_program_data_s
 {
     disco_s disco;      ///< Disco interface.
+
+    struct {
+    f32 xrot;
+    f32 yrot;
+    f32 zrot;
+    } model;
+
+    struct {
+    f32 x;
+    f32 y;
+    f32 z;
+    } camera;
+
 } pds_s;
 
 

@@ -302,6 +302,19 @@ disco_init_sdl(disco_s *disco) {
         SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, disco->prg_name, g_errbuf, NULL);
     }
 
+    // Set hints.
+    if ( true == disco->hints.bypass_x11_compositor ) {
+        SDL_SetHint(SDL_HINT_VIDEO_X11_NET_WM_BYPASS_COMPOSITOR, "1");
+    } else {
+        SDL_SetHint(SDL_HINT_VIDEO_X11_NET_WM_BYPASS_COMPOSITOR, "0");
+    }
+
+    if ( true == disco->hints.disable_screensaver ) {
+        SDL_SetHint(SDL_HINT_VIDEO_ALLOW_SCREENSAVER, "0");
+    } else {
+        SDL_SetHint(SDL_HINT_VIDEO_ALLOW_SCREENSAVER, "1");
+    }
+
     rtn = true;
 
 DONE:
@@ -600,6 +613,7 @@ disco_render_thread(void *arg)
     ImGui_ImplSDL2_InitForOpenGL(dds->window, dds->gl_context);
     ImGui_ImplOpenGL3_Init(dds->glsl_version);
 
+    // Program one-time drawing init callback.
     if ( NULL != disco->callback.draw_init ) {
         if ( 0 != disco->callback.draw_init(/*arg*/ NULL) ) {
             goto DONE;
@@ -638,9 +652,6 @@ disco_render_thread(void *arg)
         disco->winpos.w = (s32)ImGui::GetIO().DisplaySize.x;
         disco->winpos.h = (s32)ImGui::GetIO().DisplaySize.y;
 
-        ImVec4 bgcol = ImColor(disco->bgcolor.r, disco->bgcolor.g, disco->bgcolor.b, disco->bgcolor.a);
-        glClearColor(bgcol.x, bgcol.y, bgcol.z, bgcol.w);
-        glClear(GL_COLOR_BUFFER_BIT);
 
         // Drawing UI callback.
         if ( NULL != disco->callback.draw_ui ) {
@@ -653,8 +664,8 @@ disco_render_thread(void *arg)
         ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
 
         // Drawing post UI callback.
-        if ( NULL != disco->callback.draw_post_ui ) {
-            disco->callback.draw_post_ui(/*arg*/ NULL);
+        if ( NULL != disco->callback.draw ) {
+            disco->callback.draw(/*arg*/ NULL);
         }
 
         if ( false == have_vsync ) {
@@ -680,9 +691,6 @@ disco_render_thread(void *arg)
 DONE:
 
     // Cleanup.
-    if ( NULL != disco->callback.draw_cleanup ) {
-        disco->callback.draw_cleanup(/*arg*/ NULL);
-    }
 
     if ( NULL != dds->gl_context ) {
         ImGui_ImplOpenGL3_Shutdown();

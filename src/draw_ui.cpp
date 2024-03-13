@@ -104,6 +104,21 @@ draw_imgui_ui(pds_s *pds) {
         } else {
             ImGui::Text("Mouse: N/A");
         }
+
+        //float w = ImGui::GetContentRegionAvail().x - ImGui::GetStyle().ItemSpacing.y;
+        //ImGui::SetNextItemWidth(w);
+        ImGui::SliderAngle("rot x", &pds->model.xrot, -180, 180, "%.1f");
+        ImGui::SameLine();
+        ImGui::SliderFloat("cam x", &pds->camera.x, -180, 180, "%.0f");
+
+        ImGui::SliderAngle("rot y", &pds->model.yrot);
+        ImGui::SameLine();
+        ImGui::SliderFloat("cam y", &pds->camera.y, -180, 180, "%.0f");
+
+        ImGui::SliderAngle("rot z", &pds->model.zrot);
+        ImGui::SameLine();
+        ImGui::SliderFloat("cam z", &pds->camera.z, -180, 180, "%.0f");
+
     }
     ImGui::End();
 

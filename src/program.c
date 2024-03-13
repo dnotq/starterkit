@@ -27,12 +27,14 @@
 #include "cbuf.h"
 
 
+/// Drawing cleanup.
+static s32 draw_cleanup(pds_s *pds);
+
 // Disco callback functions for events and drawing.
-static s32 events(void *arg);
-static s32 draw_init(void *arg);
-static s32 draw_cleanup(void *arg);
-static s32 draw_ui(void *arg);
-static s32 draw_post_ui(void *arg);
+static s32 cb_events(void *arg);
+static s32 cb_draw_init(void *arg);
+static s32 cb_draw_ui(void *arg);
+static s32 cb_draw(void *arg);
 
 
 /// One program data set, allocated static.
@@ -87,13 +89,16 @@ main(int argc, char *argv[])
 
     pds->disco.prg_name = APP_NAME;
 
+    // Games may want to set either or both of these to true for
+    // better performance.
+    pds->disco.hints.disable_screensaver = false;
+    pds->disco.hints.bypass_x11_compositor = false;
 
     // Set the event and rendering callbacks.
-    pds->disco.callback.events          = events;
-    pds->disco.callback.draw_init       = draw_init;
-    pds->disco.callback.draw_cleanup    = draw_cleanup;
-    pds->disco.callback.draw_ui         = draw_ui;
-    pds->disco.callback.draw_post_ui    = draw_post_ui;
+    pds->disco.callback.events      = cb_events;
+    pds->disco.callback.draw_init   = cb_draw_init;
+    pds->disco.callback.draw_ui     = cb_draw_ui;
+    pds->disco.callback.draw        = cb_draw;
 
     logfmt("%s\n", pds->disco.prg_name);
     SDL_version ver;
@@ -110,6 +115,7 @@ main(int argc, char *argv[])
 DONE:
 
     // TODO any cleanup.
+    draw_cleanup(pds);
 
     return rtn;
 }
@@ -117,14 +123,14 @@ DONE:
 
 
 /**
- * Event handler.
+ * Event handler callback.
  *
  * @param[in] arg Pointer to the event SDL_Event structure.
  *
  * @return 0 if events were handled, otherwise -1.
  */
 static s32
-events(void *arg) {
+cb_events(void *arg) {
 
     SDL_Event *event = (SDL_Event *)arg;
     s32 handled = -1;
@@ -139,19 +145,15 @@ events(void *arg) {
 
     return handled;
 }
-// events()
+// cb_events()
 
 
 static s32
-draw_init(void *arg) {
+cb_draw_init(void *arg) {
 
     pds_s *pds = &g_progdata; // convenience.
     (void)arg; // unused.
     s32 rtn = -1;
-
-
-    logfmt("OpenGL %s, GLSL %s\n"
-        , glGetString(GL_VERSION), glGetString(GL_SHADING_LANGUAGE_VERSION));
 
     // TODO local drawing initialization. GL3W loader has been initialized.
 
@@ -163,14 +165,12 @@ DONE:
 
     return rtn;
 }
-// draw_init()
+// cb_draw_init()
 
 
 static s32
-draw_cleanup(void *arg) {
+draw_cleanup(pds_s *pds) {
 
-    pds_s *pds = &g_progdata; // convenience.
-    (void)arg; // unused.
     s32 rtn = -1;
 
     // TODO local drawing cleanup.
@@ -187,11 +187,11 @@ DONE:
 
 
 /**
- * Draw callback.
+ * Draw UI callback.
  *
- * The background has been cleared and a new IMGUI frame created.  Draw any
- * elements to appear under the IMGUI UI first, followed by IMGUI functions.
- * Use the draw_post_ui() function to draw on top of IMGUI.
+ * A new IMGUI frame has already been created.  Draw any elements to appear
+ * under the IMGUI UI first, followed by IMGUI functions.  Use the draw()
+ * function to draw on top of IMGUI.
  *
  * Called by the rendering thread, so it is not synchronous to the main
  * program or any other thread.
@@ -204,7 +204,7 @@ DONE:
  * @return 0 if successful, otherwise -1.
  */
 static s32
-draw_ui(void *arg) {
+cb_draw_ui(void *arg) {
 
     pds_s *pds = &g_progdata; // convenience.
     disco_s *disco = &g_progdata.disco; // convenience.
@@ -215,37 +215,48 @@ draw_ui(void *arg) {
         goto DONE;
     }
 
-    // Set background color for *next* frame.
-    disco->bgcolor.r = 0;
-    disco->bgcolor.g = 0;
-    disco->bgcolor.b = 0;
-    disco->bgcolor.a = 255;
+    // Clear the background.
+    GLfloat r = 0 / 255.0f;
+    GLfloat g = 0 / 255.0f;
+    GLfloat b = 0 / 255.0f;
+    GLfloat a = 255 / 255.0f;
+    glClearColor(r, g, b, a);
+    glClear(GL_COLOR_BUFFER_BIT);
 
-    // TODO draw anything to appear under IMGUI.
+
+    // TODO draw anything to appear under the UI.
 
 
     // IMGUI is C++, so call out to a C++ function for UI drawing.
     draw_imgui_ui(pds);
 
+
 DONE:
     return 0;
 }
-// draw_ui()
+// cb_draw_ui()
 
 
 static s32
-draw_post_ui(void *arg) {
+cb_draw(void *arg) {
 
     pds_s *pds = &g_progdata; // convenience.
+    disco_s *disco = &g_progdata.disco; // convenience.
     (void)arg; // unused.
+
+    if ( true == disco->status.minimized ) {
+        // TODO update any state or data model while minimized.
+        goto DONE;
+    }
 
     // TODO drawing after IMGUI.
 
     draw_3d(pds);
 
+DONE:
     return 0;
 }
-// draw_post_ui()
+// cb_draw()
 
 
 /*
