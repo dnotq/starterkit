@@ -12,7 +12,106 @@
  * @ref https://learnopengl.com/
  * @ref https://www.opengl-tutorial.org/
  * @ref https://en.wikipedia.org/wiki/Active_and_passive_transformation
+ *
+ * Backlog:
+ *   Add a shader loader rather than hard-coded strings.
+ *   Add error checking to shader setup.
+ *   Add a simple model database / scene graph to make drawing easier:
+ *     points
+ *     lines
+ *     triangles
+ *     textures
+ *     lights
+ *   Add an object loader (https://github.com/assimp/assimp)
  */
+
+
+/*
+This file could be used a nice starting point to learn OpenGL.  The environment
+is all set up, and all OpenGL functions are available.  Just delete all the code
+in the call-back functions (draw_3d_init, draw_3d_cleanup, draw_3d) and start
+following along with your favorite OpenGL tutorial.
+
+One of the most confusing aspects of learning OpenGL is the names given to its
+concepts, like "glGenBuffers" that does not actually generate a buffer.
+
+OpenGL has a concept of "bind points", which are basically global pointers that
+are internal to OpenGL.  Various OpenGL functions use the global bind points
+(pointers) to know what internal data buffer to operate on.  There are several
+bind points, but only one of each kind, so only one object can be "bound" at any
+one time.  The bind points for objects in OpenGL:
+
+  GL_ARRAY_BUFFER               Vertex attributes
+  GL_ATOMIC_COUNTER_BUFFER      Atomic counter storage
+  GL_COPY_READ_BUFFER           Buffer copy source
+  GL_COPY_WRITE_BUFFER          Buffer copy destination
+  GL_DISPATCH_INDIRECT_BUFFER   Indirect compute dispatch commands
+  GL_DRAW_INDIRECT_BUFFER       Indirect command arguments
+  GL_ELEMENT_ARRAY_BUFFER       Vertex array indices
+  GL_PIXEL_PACK_BUFFER          Pixel read target
+  GL_PIXEL_UNPACK_BUFFER        Texture data source
+  GL_QUERY_BUFFER               Query result buffer
+  GL_SHADER_STORAGE_BUFFER      Read-write storage for shaders
+  GL_TEXTURE_BUFFER             Texture data buffer
+  GL_TRANSFORM_FEEDBACK_BUFFER  Transform feedback buffer
+  GL_UNIFORM_BUFFER             Uniform block storage
+
+Bind points might be thought of like this (internal to OpenGL):
+
+  // Global array of bind points.
+  gl_object *bind_points[NUM_BIND_POINTS];
+  bind_points[GL_ARRAY_BUFFER] = NULL;
+
+  glBindBuffer(GL_ARRAY_BUFFER, h_user_obj_1) {
+      bind_points[GL_ARRAY_BUFFER] = get_ptr(h_user_obj_1);
+  }
+
+
+OpenGL also has internal state, which is also affected by various OpenGL
+functions.  Knowing what functions affect the state is critical to using OpenGL
+correctly and effectively.
+
+
+Some better names for a few functions would go a long way toward making OpenGL
+easier to understand and learn.  These are some alternate names for functions
+with confusing names:
+
+glGenBuffers -> glGenObject
+  Used to create an object to manage OpenGL buffers and other data.  A handle
+  to the newly created object is returned for use with other OpenGL functions.
+  The handle is opaque to the host program.
+
+glBindBuffer -> glSetGlobalObject
+  Used to assign the specified object to an internal OpenGL bind point (global
+  pointer) that is used as the target for other OpenGL functions.
+
+glBufferData -> glAllocateCopy
+  Allocates a buffer on the GPU for whatever object is currently set (bound)
+  at the specific bing point, then copies the specified data to the buffer.
+  Basically malloc() followed by memcpy().
+
+glVertexAttribPointer -> glVertexAttribFormat
+  Describes how the data in the currently bound buffer is formatted, and which
+  vertex shader attribute will use the data.  Also specifies the offset of the
+  data in the buffer.
+
+
+Example, this:
+
+  glGenBuffers(1, &pos_obj);
+  glBindBuffer(GL_ARRAY_BUFFER, pos_obj);
+  glBufferData(GL_ARRAY_BUFFER, sizeof(vertex_data), vertex_data, GL_STATIC_DRAW);
+  glBindBuffer(GL_ARRAY_BUFFER, 0);
+
+Becomes:
+
+  glGenObject(1, &pos_obj);
+  glSetGlobalObject(GL_ARRAY_BUFFER, pos_obj);
+  glAllocateCopy(GL_ARRAY_BUFFER, sizeof(vertex_data), vertex_data, GL_STATIC_DRAW);
+  glSetGlobalObject(GL_ARRAY_BUFFER, 0);
+
+
+*/
 
 #include <stdbool.h>    // true,false
 #include "GL/gl3w.h"    // OpenGL
@@ -21,9 +120,6 @@
 #include "cglm/cglm.h"  // cglm
 #include "program.h"
 #include "draw_3d.h"
-
-
-// TODO this is very WIP
 
 
 // https://www.khronos.org/opengl/wiki/Vertex_Specification_Best_Practices
@@ -40,6 +136,8 @@
 // normals: [-1,1] normalized GLshort or GL_INT_2_10_10_10_REV
 // 2D textures: normalized GLshort or GLushort
 
+
+/// Cube vertex positions.
 static const GLfloat g_cube_positions[] = {
     -0.5f, -0.5f, -0.5f, // 0 bot, lt, back
     -0.5f,  0.5f, -0.5f, // 1 top, lt, back
@@ -50,10 +148,11 @@ static const GLfloat g_cube_positions[] = {
     -0.5f, -0.5f,  0.5f, // 6 bot, lt, front
     -0.5f,  0.5f,  0.5f, // 7 top, lt, front
     // hypotenuse
-    -0.8,  0.8, -0.8,
-     0.8, -0.8,  0.8,
+    -0.6,  0.6, -0.6,
+     0.6, -0.6,  0.6,
 };
 
+/// Cube vertex colors.
 static const GLfloat g_cube_colors[] = {
     1.0, 0.0, 0.0,
     0.5, 0.0, 0.0,
@@ -64,10 +163,11 @@ static const GLfloat g_cube_colors[] = {
     1.0, 0.0, 1.0,
     0.5, 0.0, 0.5,
     // hypotenuse
-    1, 1, 1,
-    1, 1, 1,
+    1, 0.5, 0,
+    1, 0.5, 0,
 };
 
+/// Cube triangle vertex-indexes into the vertex-position and color arrays.
 static const GLushort g_cube_indexes[] = {
     0, 1, 2, // back 1
     2, 1, 3, // back 2
@@ -84,6 +184,7 @@ static const GLushort g_cube_indexes[] = {
 };
 
 
+/// Reference axis vertex positions.
 static const GLfloat g_axis_pos[] = {
     -1, 0, 0,
      1, 0, 0,
@@ -93,6 +194,7 @@ static const GLfloat g_axis_pos[] = {
      0, 0, 1,
 };
 
+/// Reference axis colors.
 static const GLfloat g_axis_col[] = {
      1, 1, 1,
      1, 1, 1,
@@ -103,32 +205,34 @@ static const GLfloat g_axis_col[] = {
 };
 
 
-static bool g_initialized = false;
-
-// Cube with VAO.
+/// Cube OpenGL object handles.
 GLuint h_cube_vao;
 GLuint h_cube_pos_vbo;
 GLuint h_cube_col_vbo;
 GLuint h_cube_idx_vbo;
 
+/// Hypotenuse VAO object handle.
 GLuint h_hyp_vao;
 
-// Axis.
+
+/// Axis OpenGL object handles.
 GLuint h_axis_vao;
 GLuint h_axis_pos_vbo;
 GLuint h_axis_col_vbo;
 
-// Shader programs.
+
+/// Shader OpenGL object handles.
 GLuint h_vertex_shader;
 GLuint h_fragment_shader;
 GLuint h_shader_prog;
 
+/// Model, view, and projection uniform OpenGL object handles.
 GLint h_model;
 GLint h_view;
 GLint h_projection;
 
 
-// Vertex shader.
+/// Vertex shader source.
 const char *vertex_src =
     "#version 450 core\n"
     "in vec3 position;\n"
@@ -143,7 +247,7 @@ const char *vertex_src =
     "    rgbcol = rgb;\n"
     "\n}";
 
-// Fragment shader.
+/// Fragment shader source.
 const char* fragment_src =
     "#version 450 core\n"
     "in vec3 rgbcol;\n"
@@ -153,6 +257,9 @@ const char* fragment_src =
     "\n}";
 
 
+/**
+ * Generate the OpenGL shaders.
+ */
 static void
 gen_shaders(void) {
 
@@ -182,16 +289,22 @@ gen_shaders(void) {
     // Link the program.
     glLinkProgram(h_shader_prog);
 }
+// gen_shaders()
 
 
+/**
+ * Initialize the 3D drawing.
+ *
+ * @param[in] pds   Program data struct object.
+ */
 void
 draw_3d_init(pds_s *pds) {
 
-    if ( true == g_initialized ) {
+    if ( true == pds->draw3d_initialized ) {
         return;
     }
 
-    g_initialized = true;
+    pds->draw3d_initialized = true;
 
     logfmt("OpenGL %s, GLSL %s\n"
         , glGetString(GL_VERSION), glGetString(GL_SHADING_LANGUAGE_VERSION));
@@ -221,6 +334,7 @@ draw_3d_init(pds_s *pds) {
 
     // Set up how the position data is formatted to the shader input attribute.
     GLint attr_loc = glGetAttribLocation(h_shader_prog, "position");
+    // The VAO will capture which buffer is bound for the attribute association.
     glVertexAttribPointer(attr_loc, /*num vals*/ 3, /*type*/ GL_FLOAT, /*normalize*/ GL_FALSE, /*stride*/ 0, /*offset*/ 0);
     glEnableVertexAttribArray(attr_loc);
 
@@ -233,7 +347,7 @@ draw_3d_init(pds_s *pds) {
     glEnableVertexAttribArray(attr_loc);
 
     // Create an index buffer and copy data to the GPU.  Unlike GL_ARRAY_BUFFER
-    // VBO binding, the GL_ELEMENT_ARRAY_BUFFER binding is captured in the VAO,
+    // VBO binding, the GL_ELEMENT_ARRAY_BUFFER binding is captured by the VAO,
     // and is required to use the glDrawElements commands.
     glGenBuffers(1, &h_cube_idx_vbo);
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, h_cube_idx_vbo);
@@ -261,6 +375,7 @@ draw_3d_init(pds_s *pds) {
     glVertexAttribPointer(attr_loc, /*num vals*/ 3, /*type*/ GL_FLOAT, /*normalize*/ GL_FALSE, /*stride*/ 0, /*offset*/ 0);
     glEnableVertexAttribArray(attr_loc);
 
+    glBindBuffer(GL_ARRAY_BUFFER, 0);
     glBindVertexArray(0);
 
 
@@ -279,10 +394,15 @@ draw_3d_init(pds_s *pds) {
 // draw_3d_init()
 
 
+/**
+ * Cleanup the 3D drawing.
+ *
+ * @param[in] pds   Program data struct object.
+ */
 void
 draw_3d_cleanup(pds_s *pds) {
 
-    if ( false == g_initialized ) {
+    if ( false == pds->draw3d_initialized ) {
         return;
     }
 
@@ -298,20 +418,36 @@ draw_3d_cleanup(pds_s *pds) {
 // draw_3d_cleanup()
 
 
+/**
+ * 3D drawing.
+ *
+ * @param[in] pds   Program data struct object.
+ */
 void
 draw_3d(pds_s *pds) {
 
-    draw_3d_init(pds);
-
+    // Updated per frame to track window size changes.
     f32 aspect = (f32)(pds->disco.winpos.w) / (f32)(pds->disco.winpos.h);
 
+    // TODO update projects to be UI selectable and calculate approximate
+    //      view between projection and orthographic so switching from one
+    //      to the other is not visually jarring.
     mat4 projection;
-    glm_perspective(/*fovy*/ 50.0f, aspect, /*near-z*/ 0.1f, /*far-z*/ 100.0f, projection);
-    //f32 orth = 2.0f;
-    //glm_ortho(/*l*/ -orth*aspect, /*r*/ orth*aspect, /*b*/ -orth, /*t*/ orth, /*near*/ 0.0f, /*far*/ 100.0f, projection);
+    //glm_perspective(/*fovy*/ 50.0f, aspect, /*near-z*/ 0.1f, /*far-z*/ 100.0f, projection);
+    f32 orth = 2.0f;
+    glm_ortho(/*l*/ -orth*aspect, /*r*/ orth*aspect, /*b*/ -orth, /*t*/ orth, /*near*/ 0.0f, /*far*/ 100.0f, projection);
 
+    // TODO make camera a rotation rather than an xyz vector.
+    // Camera position has UI inputs.
     mat4 view;
     glm_lookat((vec3){pds->camera.x,pds->camera.y,pds->camera.z}, (vec3){0,0,0}, (vec3){0,1,0}, view);
+
+    // Matrix multiply is NOT commutative, order matters.
+
+    mat4 model;
+    glm_mat4_identity(model);
+    // Move cube to its corner for rotation.
+    //glm_translate_make(model, (vec3){-0.5,0.5,-0.5});
 
     // Use quaternions to simplify rotations and set up rotations
     // around a global axis that does not change with the object
@@ -324,15 +460,22 @@ draw_3d(pds_s *pds) {
     glm_quat_mul(rz,q,q); // q = rz * q
     glm_quat_mul(rx,q,q); // q = rx * q
     glm_quat_mul(ry,q,q); // q = ry * q
-    mat4 model;
-    glm_quat_mat4(q, model);
+    mat4 rot;
+    glm_quat_mat4(q, rot);
+
+    glm_mat4_mul(rot, model, model); // model = rot * model
 
 
-    // Global state, does not need to be called every frame, but can be
-    // called between draw calls if necessary, depending on models.
+    // Global state, does not need to be called every frame, but these
+    // can be called between various draw calls depending what the
+    // kind of rendering result is desired.
     glEnable(GL_CULL_FACE);
     glCullFace(GL_BACK);
     glFrontFace(GL_CCW);
+
+    //glPolygonMode(GL_FRONT, GL_LINE);
+    glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+    //glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
 
     glUseProgram(h_shader_prog);
 
@@ -340,24 +483,23 @@ draw_3d(pds_s *pds) {
     glUniformMatrix4fv(h_view,       /*count*/ 1, /*transpose*/ GL_FALSE, view[0]);
     glUniformMatrix4fv(h_projection, /*count*/ 1, /*transpose*/ GL_FALSE, projection[0]);
 
-    //glPolygonMode(GL_FRONT, GL_LINE);
-    glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
-    //glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
-
     glBindVertexArray(h_cube_vao);
     GLsizei count = sizeof(g_cube_indexes) / sizeof(GLshort);
     glDrawElements(GL_TRIANGLES, count, GL_UNSIGNED_SHORT, /*offset*/ NULL);
-    // Draw hypotenuse.
-    glDrawArrays(GL_LINES, 8, 2);
+    // Draw hypotenuse with the vertex-position data.  The offset and count
+    // inputs to glDrawArrays() are element-size units, not bytes.
+    glDrawArrays(GL_LINES, /*offset*/ 8, /*count*/ 2);
 
     // Draw reference axis without any transformations.
     glm_mat4_identity(model);
     glUniformMatrix4fv(h_model, /*count*/ 1, /*transpose*/ GL_FALSE, model[0]);
 
     glBindVertexArray(h_axis_vao);
-    count = sizeof(g_axis_pos) / sizeof(GLfloat);
-    glDrawArrays(GL_LINES, /*first*/0, count);
+    count = sizeof(g_axis_pos) / (sizeof(GLfloat) * 3);
+    glDrawArrays(GL_LINES, /*first*/ 0, count);
 
+    glBindVertexArray(0);
+    glUseProgram(0);
 }
 // draw_3d()
 

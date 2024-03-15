@@ -4,6 +4,13 @@
  * @file   program.c
  * @author Matthew Hagerty
  * @date   April 5, 2020
+ *
+ * Example program to use the starterkit:
+ *   1. Make a disco struct.
+ *   2. Initialize the disco struct.
+ *   3. Call disco_run() and pass in the disco struct you created.
+ *
+ * Everything else is your own program.
  */
 
 #include <string.h>         // memset
@@ -76,6 +83,15 @@ main(int argc, char *argv[])
     // Initialize the program data and set up disco.
     memset(pds, 0, sizeof(*pds));
 
+    pds->draw3d_initialized = false;
+
+
+    // ====
+    // A disco struct must be initialized and passed to disco_run().
+    // EVERYTHING else is your program.
+    // ====
+
+
     // Use the IMGUI built-in ini capability for now.
     pds->disco.imgui_ini_filename = "starterkit.ini";
 
@@ -100,12 +116,17 @@ main(int argc, char *argv[])
     pds->disco.callback.draw_ui     = cb_draw_ui;
     pds->disco.callback.draw        = cb_draw;
 
+
+    // Print some version information to stdout (the graphic console is not
+    // available yet).
     logfmt("%s\n", pds->disco.prg_name);
     SDL_version ver;
     SDL_GetVersion(&ver);
     logfmt("SDL version: %d.%d.%d\n", ver.major, ver.minor, ver.patch);
 
+
     // TODO create other program threads as needed.
+
 
     // Run disco.  Does not return until exit.
     disco_run(&pds->disco);
@@ -148,6 +169,13 @@ cb_events(void *arg) {
 // cb_events()
 
 
+/**
+ * Draw initialization callback.
+ *
+ * @param[in] arg unused.
+ *
+ * @return 0 if successful, otherwise -1.
+ */
 static s32
 cb_draw_init(void *arg) {
 
@@ -168,6 +196,13 @@ DONE:
 // cb_draw_init()
 
 
+/**
+ * Draw cleanup.
+ *
+ * @param[in] pds Program data struct.
+ *
+ * @return 0 if successful, otherwise -1.
+ */
 static s32
 draw_cleanup(pds_s *pds) {
 
@@ -237,6 +272,15 @@ DONE:
 // cb_draw_ui()
 
 
+/**
+ * Draw callback.
+ *
+ * Drawing other the UI.  Called after the UI drawing callback.
+ *
+ * @param[in] arg unused.
+ *
+ * @return 0 if successful, otherwise -1.
+ */
 static s32
 cb_draw(void *arg) {
 

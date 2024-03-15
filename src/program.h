@@ -32,10 +32,12 @@ extern "C" {
 #endif
 
 
-/// Program Data Structure.  Program-wide data.
+/// Program Data Structure.
 typedef struct t_program_data_s
 {
-    disco_s disco;      ///< Disco interface.
+    disco_s disco;              ///< Disco interface.
+
+    bool draw3d_initialized;    ///< True if the 3D drawing subsystem was initialized.
 
     struct {
     f32 xrot;
